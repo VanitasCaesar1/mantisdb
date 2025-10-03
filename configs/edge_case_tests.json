@@ -1,0 +1,25 @@
+{
+  "storage_config": {
+    "data_dir": "./test_data_edge_cases",
+    "buffer_size": 1048576,
+    "cache_size": 52428800,
+    "use_cgo": false,
+    "sync_writes": true
+  },
+  "cache_config": {
+    "max_size": 52428800,
+    "default_ttl": 3600000000000,
+    "cleanup_interval": 300000000000,
+    "eviction_policy": "lru"
+  },
+  "test_config": {
+    "large_document_sizes": [1048576, 5242880, 10485760],
+    "high_ttl_values": [90000, 604800, 2592000],
+    "concurrency_levels": [10, 50, 100, 500],
+    "memory_pressure_levels": [0.5, 0.7, 0.8, 0.9],
+    "timeout_duration": 1800000000000
+  },
+  "output_format": "text",
+  "output_file": "",
+  "verbose": false
+}

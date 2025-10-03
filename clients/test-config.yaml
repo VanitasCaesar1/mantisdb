@@ -1,0 +1,198 @@
+# MantisDB Client Library Test Configuration
+
+# Test server configuration
+server:
+  host: localhost
+  port: 8080
+  username: admin
+  password: password
+  api_key: ""  # Optional API key for testing
+  
+# Test database configuration
+database:
+  test_db_prefix: "test_"
+  cleanup_on_failure: true
+  max_test_tables: 100
+
+# Performance test configuration
+performance:
+  enabled: true
+  query_iterations: 100
+  concurrent_workers: 10
+  operations_per_worker: 50
+  timeout_seconds: 30
+
+# Load test configuration
+load_tests:
+  enabled: false  # Disabled by default, enable with --load-tests flag
+  duration_seconds: 60
+  max_workers: 50
+  operations_per_worker: 100
+  ramp_up_seconds: 10
+
+# Test data configuration
+test_data:
+  unicode_strings:
+    - "Hello World"
+    - "测试数据"  # Chinese
+    - "Тестовые данные"  # Russian
+    - "テストデータ"  # Japanese
+    - "🚀 Emoji test 🎉"
+  
+  large_data:
+    small_text_size: 1024      # 1KB
+    medium_text_size: 102400   # 100KB
+    large_text_size: 1048576   # 1MB
+    
+  data_types:
+    - type: "string"
+      values: ["test", "hello world", ""]
+    - type: "integer"
+      values: [0, 1, -1, 42, 2147483647, -2147483648]
+    - type: "float"
+      values: [0.0, 1.5, -1.5, 3.14159, 1.7976931348623157e+308]
+    - type: "boolean"
+      values: [true, false]
+    - type: "null"
+      values: [null]
+
+# Client-specific test configuration
+clients:
+  go:
+    enabled: true
+    test_files:
+      - "integration_test.go"
+      - "performance_test.go"
+    build_flags: ["-race"]
+    benchmark_flags: ["-benchmem"]
+    
+  python:
+    enabled: true
+    test_files:
+      - "tests/test_integration.py"
+      - "tests/test_performance.py"
+    python_versions: ["3.8", "3.9", "3.10", "3.11", "3.12"]
+    pytest_flags: ["-v", "--tb=short"]
+    coverage_threshold: 80
+    
+  javascript:
+    enabled: true
+    test_files:
+      - "tests/integration.test.ts"
+    node_versions: ["16", "18", "20"]
+    jest_flags: ["--verbose", "--detectOpenHandles"]
+    coverage_threshold: 80
+
+# Error handling test scenarios
+error_scenarios:
+  - name: "invalid_sql"
+    query: "INVALID SQL STATEMENT"
+    expected_error: "SYNTAX_ERROR"
+    
+  - name: "non_existent_table"
+    query: "SELECT * FROM non_existent_table_12345"
+    expected_error: "TABLE_NOT_FOUND"
+    
+  - name: "connection_timeout"
+    simulate: "timeout"
+    timeout_ms: 1
+    expected_error: "TIMEOUT"
+    
+  - name: "authentication_failure"
+    simulate: "auth_failure"
+    expected_error: "AUTH_ERROR"
+
+# Concurrency test scenarios
+concurrency_scenarios:
+  - name: "read_heavy"
+    readers: 20
+    writers: 2
+    duration_seconds: 10
+    
+  - name: "write_heavy"
+    readers: 2
+    writers: 20
+    duration_seconds: 10
+    
+  - name: "mixed_workload"
+    readers: 10
+    writers: 10
+    duration_seconds: 15
+
+# Transaction test scenarios
+transaction_scenarios:
+  - name: "simple_commit"
+    operations: 5
+    commit: true
+    
+  - name: "simple_rollback"
+    operations: 5
+    commit: false
+    
+  - name: "nested_operations"
+    operations: 10
+    nested_queries: 3
+    commit: true
+    
+  - name: "concurrent_transactions"
+    concurrent_count: 5
+    operations_per_tx: 3
+    commit_ratio: 0.8  # 80% commit, 20% rollback
+
+# Cross-platform test configuration
+cross_platform:
+  test_unicode: true
+  test_large_data: true
+  test_binary_data: true
+  test_timezone_handling: true
+  
+  platforms:
+    - name: "linux"
+      enabled: true
+    - name: "macos"
+      enabled: true
+    - name: "windows"
+      enabled: true
+
+# Monitoring and reporting
+monitoring:
+  collect_metrics: true
+  log_level: "INFO"  # DEBUG, INFO, WARN, ERROR
+  output_format: "json"  # json, text, junit
+  
+  metrics:
+    - "query_duration"
+    - "connection_count"
+    - "error_rate"
+    - "throughput"
+    - "memory_usage"
+
+# Test environment setup
+environment:
+  setup_scripts:
+    - "scripts/setup-test-db.sh"
+  
+  teardown_scripts:
+    - "scripts/cleanup-test-db.sh"
+  
+  required_tools:
+    - name: "curl"
+      version: ">=7.0"
+    - name: "jq"
+      version: ">=1.6"
+      optional: true
+
+# CI/CD integration
+ci:
+  parallel_execution: true
+  fail_fast: false
+  retry_failed_tests: 2
+  
+  artifacts:
+    - "test-results.xml"
+    - "coverage-report.html"
+    - "performance-report.json"
+    
+  notifications:
+    slack_webhook: ""  # Optional Slack webhook for notifications
+    email_recipients: []  # Optional email list for notifications

@@ -1,0 +1,48 @@
+# MantisDB Build Configuration
+
+# Binary configuration
+binary:
+  name: "mantisdb"
+  version: "1.0.0"
+  build_flags: "-ldflags=-s -w"
+
+# Admin dashboard configuration
+admin:
+  port: 8081
+  frontend_dir: "admin/frontend"
+  assets_dir: "admin/assets/dist"
+  api_dir: "admin/api"
+
+# Client libraries configuration
+clients:
+  go:
+    module: "github.com/mantisdb/mantisdb/clients/go"
+    build_dir: "clients/go"
+  python:
+    package: "mantisdb-python"
+    build_dir: "clients/python"
+  javascript:
+    package: "mantisdb-js"
+    build_dir: "clients/javascript"
+
+# Cross-platform build targets
+platforms:
+  - "linux/amd64"
+  - "linux/arm64"
+  - "darwin/amd64"
+  - "darwin/arm64"
+  - "windows/amd64"
+
+# Development configuration
+development:
+  frontend_port: 3000
+  admin_port: 8081
+  hot_reload: true
+  log_level: "debug"
+
+# Production configuration
+production:
+  optimize: true
+  compress_assets: true
+  strip_debug: true
+  embed_assets: true

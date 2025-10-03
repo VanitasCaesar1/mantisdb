@@ -1,0 +1,72 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  
+  /* Mantis theme CSS variables */
+  --mantis-primary: #16a34a;
+  --mantis-primary-dark: #15803d;
+  --mantis-primary-light: #22c55e;
+  --mantis-secondary: #84cc16;
+  --mantis-accent: #4ade80;
+  --mantis-background: #f8fafc;
+  --mantis-surface: #ffffff;
+  --mantis-text: #1e293b;
+  --mantis-text-secondary: #64748b;
+  
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--mantis-background);
+  color: var(--mantis-text);
+}
+
+#root {
+  width: 100%;
+  min-height: 100vh;
+}
+
+/* Custom component styles */
+@layer components {
+  .mantis-card {
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
+  }
+  
+  .mantis-button-primary {
+    @apply bg-mantis-600 hover:bg-mantis-700 text-white font-medium px-4 py-2 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-mantis-500 focus:ring-offset-2;
+  }
+  
+  .mantis-button-secondary {
+    @apply bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium px-4 py-2 rounded-md transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+  }
+  
+  .mantis-input {
+    @apply w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-mantis-500 focus:border-mantis-500;
+  }
+  
+  .mantis-sidebar {
+    @apply bg-mantis-800 text-mantis-100 min-h-screen w-64 fixed left-0 top-0 z-10;
+  }
+  
+  .mantis-nav-item {
+    @apply flex items-center px-4 py-3 text-mantis-200 hover:bg-mantis-700 hover:text-white transition-colors duration-200;
+  }
+  
+  .mantis-nav-item.active {
+    @apply bg-mantis-700 text-white border-r-2 border-mantis-400;
+  }
+}

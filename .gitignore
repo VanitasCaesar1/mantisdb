@@ -1,0 +1,124 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+mantisdb
+mantisdb.exe
+admin-server
+admin-server.exe
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+vendor/
+
+# Go workspace file
+go.work
+
+# Data directories
+data/
+test_data/
+*.db
+*.sqlite
+*.sqlite3
+
+# Log files
+*.log
+logs/
+
+# Configuration files with secrets
+config.local.yaml
+config.production.yaml
+.env
+.env.local
+.env.production
+
+# Build artifacts
+dist/
+build/
+target/
+
+# Admin dashboard build artifacts
+admin/assets/dist/
+admin/frontend/node_modules/
+admin/frontend/dist/
+admin/frontend/.next/
+admin/frontend/out/
+
+# Client library build artifacts
+clients/javascript/node_modules/
+clients/javascript/dist/
+clients/python/build/
+clients/python/dist/
+clients/python/*.egg-info/
+clients/python/__pycache__/
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+tmp/
+temp/
+
+# Backup files
+*.bak
+*.backup
+
+# Cache directories
+cache/
+.cache/
+
+# Benchmark results
+benchmark_results.json
+*.bench
+
+# Coverage reports
+coverage.out
+coverage.html
+
+# Profiling data
+*.prof
+*.pprof
+
+# Memory dumps
+*.mem
+
+# Core dumps
+core.*
+
+# Package files
+*.tar.gz
+*.zip
+*.rar
+
+# Security and certificates
+*.pem
+*.key
+*.crt
+*.p12
+*.pfx
+
+# Local development
+local/
+dev/
