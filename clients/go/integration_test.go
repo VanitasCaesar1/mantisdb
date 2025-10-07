@@ -29,7 +29,8 @@ func getEnv(key, defaultValue string) string {
 
 func getEnvInt(key string, defaultValue int) int {
 	if value := os.Getenv(key); value != "" {
-		if intValue, err := fmt.Sscanf(value, "%d", &intValue); err == nil {
+		var intValue int
+		if _, err := fmt.Sscanf(value, "%d", &intValue); err == nil {
 			return intValue
 		}
 	}

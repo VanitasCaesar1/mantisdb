@@ -1,256 +1,384 @@
 # MantisDB Installation Guide
 
-This guide covers all installation methods for MantisDB across different platforms and environments.
+Complete installation instructions for all platforms.
 
-## 📋 System Requirements
+## Table of Contents
 
-### Minimum Requirements
-- **CPU**: 2 cores
-- **Memory**: 2GB RAM
-- **Storage**: 1GB free space
-- **OS**: Linux, macOS, or Windows
+- [Quick Install](#quick-install)
+- [Platform-Specific Installation](#platform-specific-installation)
+  - [Windows](#windows)
+  - [macOS](#macos)
+  - [Linux](#linux)
+- [Building from Source](#building-from-source)
+- [Configuration](#configuration)
+- [Verification](#verification)
+- [Troubleshooting](#troubleshooting)
 
-### Recommended for Production
-- **CPU**: 4+ cores
-- **Memory**: 8GB+ RAM (4GB for cache, 4GB for system)
-- **Storage**: SSD with 10GB+ free space
-- **Network**: 1Gbps+ for distributed deployments
+---
 
-## 🚀 Quick Installation
+## Quick Install
 
-### Linux/macOS (One-liner)
+### Windows
 
-```bash
-curl -L https://github.com/mantisdb/mantisdb/releases/latest/download/mantisdb-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m).tar.gz | tar xz && cd mantisdb-* && sudo ./install.sh
+**Option 1: MSI Installer (Recommended)**
+```powershell
+# Download and run the MSI installer
+# This will install MantisDB to C:\Program Files\MantisDB
+# and add it to your PATH
 ```
 
-### Windows (PowerShell as Administrator)
-
+**Option 2: PowerShell Script**
 ```powershell
-# Download latest release
-$latest = Invoke-RestMethod -Uri "https://api.github.com/repos/mantisdb/mantisdb/releases/latest"
-$downloadUrl = $latest.assets | Where-Object { $_.name -like "*windows-amd64.zip" } | Select-Object -ExpandProperty browser_download_url
-Invoke-WebRequest -Uri $downloadUrl -OutFile "mantisdb-windows-amd64.zip"
-
-# Extract and install
-Expand-Archive -Path "mantisdb-windows-amd64.zip" -DestinationPath "."
-cd mantisdb-windows-amd64
+# Run as Administrator
 .\install.ps1
 ```
 
-## 📦 Installation Methods
-
-### 1. Pre-built Binaries (Recommended)
-
-#### Download from GitHub Releases
-
-1. Go to [GitHub Releases](https://github.com/mantisdb/mantisdb/releases)
-2. Download the appropriate binary for your platform:
-   - `mantisdb-linux-amd64.tar.gz` - Linux x86_64
-   - `mantisdb-linux-arm64.tar.gz` - Linux ARM64
-   - `mantisdb-darwin-amd64.tar.gz` - macOS Intel
-   - `mantisdb-darwin-arm64.tar.gz` - macOS Apple Silicon
-   - `mantisdb-windows-amd64.zip` - Windows x86_64
-
-3. Extract the archive:
-   ```bash
-   # Linux/macOS
-   tar -xzf mantisdb-*.tar.gz
-   cd mantisdb-*
-   
-   # Windows
-   # Extract using Windows Explorer or PowerShell
-   ```
-
-4. Run the installer:
-   ```bash
-   # Linux/macOS
-   sudo ./install.sh
-   
-   # Windows (as Administrator)
-   .\install.ps1
-   ```
-
-### 2. Docker
-
-#### Docker Run
-
-```bash
-# Basic setup
-docker run -d \
-  --name mantisdb \
-  -p 8080:8080 \
-  -p 8081:8081 \
-  -v mantisdb_data:/var/lib/mantisdb \
-  mantisdb/mantisdb:latest
-
-# With custom configuration
-docker run -d \
-  --name mantisdb \
-  -p 8080:8080 \
-  -p 8081:8081 \
-  -v mantisdb_data:/var/lib/mantisdb \
-  -v $(pwd)/config.yaml:/etc/mantisdb/config.yaml:ro \
-  -e MANTIS_ADMIN_TOKEN="your-secure-token" \
-  mantisdb/mantisdb:latest
+**Option 3: Manual Installation**
+```powershell
+# Extract the ZIP file
+# Copy mantisdb.exe to a directory in your PATH
+# Or add the directory to PATH
 ```
 
-#### Docker Compose
+### macOS
 
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  mantisdb:
-    image: mantisdb/mantisdb:latest
-    container_name: mantisdb
-    restart: unless-stopped
-    ports:
-      - "8080:8080"
-      - "8081:8081"
-    volumes:
-      - mantisdb_data:/var/lib/mantisdb
-      - ./configs/production.yaml:/etc/mantisdb/config.yaml:ro
-    environment:
-      - MANTIS_ADMIN_TOKEN=${MANTIS_ADMIN_TOKEN}
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-volumes:
-  mantisdb_data:
-```
-
-Start with:
+**Option 1: Homebrew (Recommended)**
 ```bash
-export MANTIS_ADMIN_TOKEN="$(openssl rand -hex 32)"
-docker-compose up -d
-```
-
-### 3. Build from Source
-
-#### Prerequisites
-
-- **Go**: 1.21 or later
-- **Node.js**: 18 or later
-- **Git**: Latest version
-
-#### Build Steps
-
-```bash
-# Clone repository
-git clone https://github.com/mantisdb/mantisdb.git
-cd mantisdb
-
-# Install dependencies
-make deps
-
-# Build for development
-make build
-
-# Build for production (all platforms)
-make production
-
-# Install locally
-make install
-```
-
-### 4. Package Managers
-
-#### Homebrew (macOS/Linux)
-
-```bash
-# Add tap (coming soon)
 brew tap mantisdb/tap
 brew install mantisdb
 ```
 
-#### Chocolatey (Windows)
+**Option 2: DMG Installer**
+```bash
+# Download the .dmg file
+# Double-click to mount
+# Drag MantisDB.app to Applications
+# Or run Install.command for CLI installation
+```
 
+**Option 3: Direct Binary**
+```bash
+# Download the binary for your architecture
+curl -L https://github.com/mantisdb/mantisdb/releases/latest/download/mantisdb-darwin-$(uname -m).tar.gz | tar xz
+sudo mv mantisdb /usr/local/bin/
+```
+
+### Linux
+
+**Option 1: Package Manager**
+
+**Ubuntu/Debian:**
+```bash
+wget https://github.com/mantisdb/mantisdb/releases/latest/download/mantisdb_VERSION_amd64.deb
+sudo dpkg -i mantisdb_VERSION_amd64.deb
+```
+
+**RHEL/CentOS/Fedora:**
+```bash
+wget https://github.com/mantisdb/mantisdb/releases/latest/download/mantisdb-VERSION-1.x86_64.rpm
+sudo rpm -i mantisdb-VERSION-1.x86_64.rpm
+```
+
+**Option 2: Install Script**
+```bash
+curl -fsSL https://raw.githubusercontent.com/mantisdb/mantisdb/main/scripts/install.sh | bash
+```
+
+**Option 3: Manual Installation**
+```bash
+# Download and extract
+wget https://github.com/mantisdb/mantisdb/releases/latest/download/mantisdb-linux-amd64.tar.gz
+tar -xzf mantisdb-linux-amd64.tar.gz
+sudo mv mantisdb /usr/local/bin/
+```
+
+---
+
+## Platform-Specific Installation
+
+### Windows
+
+#### System Requirements
+- Windows 10 or later (64-bit)
+- 2GB RAM minimum (4GB recommended)
+- 500MB disk space
+
+#### Installation Steps
+
+1. **Download the Installer**
+   - Visit [releases page](https://github.com/mantisdb/mantisdb/releases)
+   - Download `MantisDB-VERSION-Windows-amd64-Installer.zip`
+
+2. **Run the Installer**
+   ```powershell
+   # Extract the ZIP file
+   Expand-Archive MantisDB-VERSION-Windows-amd64-Installer.zip
+   
+   # Run as Administrator
+   cd MantisDB-VERSION-Windows-amd64-Installer
+   .\install.ps1
+   ```
+
+3. **Verify Installation**
+   ```powershell
+   mantisdb --version
+   ```
+
+#### Default Locations
+- **Binary**: `C:\Program Files\MantisDB\mantisdb.exe`
+- **Config**: `C:\ProgramData\MantisDB\config.yaml`
+- **Data**: `C:\ProgramData\MantisDB\data`
+- **Logs**: `C:\ProgramData\MantisDB\logs`
+
+#### Running as a Service
+
+**Using NSSM (Non-Sucking Service Manager):**
 ```powershell
-# Coming soon
-choco install mantisdb
+# Install NSSM
+choco install nssm
+
+# Create service
+nssm install MantisDB "C:\Program Files\MantisDB\mantisdb.exe" --config="C:\ProgramData\MantisDB\config.yaml"
+
+# Start service
+nssm start MantisDB
 ```
 
-#### APT (Ubuntu/Debian)
+**Using sc.exe:**
+```powershell
+sc.exe create MantisDB binPath= "C:\Program Files\MantisDB\mantisdb.exe --config=C:\ProgramData\MantisDB\config.yaml" start= auto
+sc.exe start MantisDB
+```
+
+---
+
+### macOS
+
+#### System Requirements
+- macOS 10.15 (Catalina) or later
+- Intel or Apple Silicon
+- 2GB RAM minimum (4GB recommended)
+- 500MB disk space
+
+#### Installation Steps
+
+**Method 1: Homebrew (Recommended)**
 
 ```bash
-# Add repository (coming soon)
-curl -fsSL https://packages.mantisdb.com/gpg | sudo apt-key add -
-echo "deb https://packages.mantisdb.com/apt stable main" | sudo tee /etc/apt/sources.list.d/mantisdb.list
-sudo apt update
-sudo apt install mantisdb
+# Add the MantisDB tap
+brew tap mantisdb/tap
+
+# Install MantisDB
+brew install mantisdb
+
+# Start as a service
+brew services start mantisdb
+
+# Or run manually
+mantisdb
 ```
 
-## ⚙️ Configuration
+**Method 2: DMG Installer**
 
-### Default Locations
+1. Download `MantisDB-VERSION-macOS-universal.dmg`
+2. Double-click to mount the DMG
+3. Drag `MantisDB.app` to Applications folder
+4. Or run `Install.command` for CLI installation
 
-- **Linux**: `/etc/mantisdb/config.yaml`
-- **macOS**: `/usr/local/etc/mantisdb/config.yaml`
-- **Windows**: `%PROGRAMDATA%\MantisDB\config.yaml`
-
-### Environment Variables
+**Method 3: Direct Binary**
 
 ```bash
-# Essential settings
-export MANTIS_ADMIN_TOKEN="your-secure-token"
-export MANTIS_DATA_DIR="/var/lib/mantisdb"
-export MANTIS_LOG_LEVEL="info"
+# For Intel Macs
+curl -L https://github.com/mantisdb/mantisdb/releases/latest/download/mantisdb-darwin-amd64.tar.gz | tar xz
+sudo mv mantisdb /usr/local/bin/
 
-# Optional settings
-export MANTIS_PORT="8080"
-export MANTIS_ADMIN_PORT="8081"
-export MANTIS_CACHE_SIZE="512MB"
+# For Apple Silicon Macs
+curl -L https://github.com/mantisdb/mantisdb/releases/latest/download/mantisdb-darwin-arm64.tar.gz | tar xz
+sudo mv mantisdb /usr/local/bin/
 ```
 
-### Configuration File
+#### Default Locations
+- **Binary**: `/usr/local/bin/mantisdb` (Homebrew) or `/Applications/MantisDB.app` (DMG)
+- **Config**: `/usr/local/etc/mantisdb/config.yaml` (Homebrew) or `~/.mantisdb/config.yaml`
+- **Data**: `/usr/local/var/lib/mantisdb` (Homebrew) or `~/.mantisdb/data`
+- **Logs**: `/usr/local/var/log/mantisdb` (Homebrew) or `~/.mantisdb/logs`
 
-Create `/etc/mantisdb/config.yaml`:
+#### Running as a Service
 
-```yaml
+**Using Homebrew:**
+```bash
+brew services start mantisdb
+brew services stop mantisdb
+brew services restart mantisdb
+```
+
+**Using launchd:**
+```bash
+# Create plist file
+sudo tee /Library/LaunchDaemons/com.mantisdb.mantisdb.plist << EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.mantisdb.mantisdb</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/mantisdb</string>
+        <string>--config=/usr/local/etc/mantisdb/config.yaml</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>/usr/local/var/log/mantisdb/mantisdb.log</string>
+    <key>StandardErrorPath</key>
+    <string>/usr/local/var/log/mantisdb/mantisdb.log</string>
+</dict>
+</plist>
+EOF
+
+# Load and start
+sudo launchctl load /Library/LaunchDaemons/com.mantisdb.mantisdb.plist
+```
+
+---
+
+### Linux
+
+#### System Requirements
+- Linux kernel 3.10 or later
+- 2GB RAM minimum (4GB recommended)
+- 500MB disk space
+- systemd (for service management)
+
+#### Installation Steps
+
+**Method 1: DEB Package (Ubuntu/Debian)**
+
+```bash
+# Download the package
+wget https://github.com/mantisdb/mantisdb/releases/latest/download/mantisdb_VERSION_amd64.deb
+
+# Install
+sudo dpkg -i mantisdb_VERSION_amd64.deb
+
+# Start service
+sudo systemctl start mantisdb
+sudo systemctl enable mantisdb
+```
+
+**Method 2: RPM Package (RHEL/CentOS/Fedora)**
+
+```bash
+# Download the package
+wget https://github.com/mantisdb/mantisdb/releases/latest/download/mantisdb-VERSION-1.x86_64.rpm
+
+# Install
+sudo rpm -i mantisdb-VERSION-1.x86_64.rpm
+
+# Start service
+sudo systemctl start mantisdb
+sudo systemctl enable mantisdb
+```
+
+**Method 3: Install Script**
+
+```bash
+# Download and run install script
+curl -fsSL https://raw.githubusercontent.com/mantisdb/mantisdb/main/scripts/install.sh | sudo bash
+
+# Or download first and inspect
+curl -fsSL https://raw.githubusercontent.com/mantisdb/mantisdb/main/scripts/install.sh -o install.sh
+chmod +x install.sh
+sudo ./install.sh
+```
+
+**Method 4: Manual Installation**
+
+```bash
+# Download binary
+wget https://github.com/mantisdb/mantisdb/releases/latest/download/mantisdb-linux-amd64.tar.gz
+
+# Extract
+tar -xzf mantisdb-linux-amd64.tar.gz
+
+# Install
+sudo mv mantisdb /usr/local/bin/
+sudo chmod +x /usr/local/bin/mantisdb
+
+# Create directories
+sudo mkdir -p /etc/mantisdb /var/lib/mantisdb /var/log/mantisdb
+
+# Create config
+sudo tee /etc/mantisdb/config.yaml << EOF
 server:
   port: 8080
   admin_port: 8081
   host: "0.0.0.0"
 
-database:
+storage:
   data_dir: "/var/lib/mantisdb"
-  cache_size: "512MB"
-  buffer_size: "128MB"
-  use_cgo: false
-  sync_writes: true
-
-security:
-  admin_token: "${MANTIS_ADMIN_TOKEN}"
-  enable_cors: false
+  engine: "auto"
 
 logging:
   level: "info"
-  format: "json"
-  output: "stdout"
+  file: "/var/log/mantisdb/mantisdb.log"
 
-backup:
-  enabled: true
-  schedule: "0 2 * * *"
-  retention_days: 30
+cache:
+  size: 268435456  # 256MB
+EOF
+
+# Create systemd service
+sudo tee /etc/systemd/system/mantisdb.service << EOF
+[Unit]
+Description=MantisDB Multi-Model Database
+After=network.target
+
+[Service]
+Type=simple
+User=mantisdb
+Group=mantisdb
+ExecStart=/usr/local/bin/mantisdb --config=/etc/mantisdb/config.yaml
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Create user
+sudo useradd --system --home /var/lib/mantisdb --shell /bin/false mantisdb
+
+# Set permissions
+sudo chown -R mantisdb:mantisdb /var/lib/mantisdb /var/log/mantisdb
+
+# Enable and start
+sudo systemctl daemon-reload
+sudo systemctl enable mantisdb
+sudo systemctl start mantisdb
 ```
 
-## 🔧 Service Management
+#### Default Locations
+- **Binary**: `/usr/bin/mantisdb` or `/usr/local/bin/mantisdb`
+- **Config**: `/etc/mantisdb/config.yaml`
+- **Data**: `/var/lib/mantisdb`
+- **Logs**: `/var/log/mantisdb/mantisdb.log`
 
-### Systemd (Linux)
-
-The installer automatically creates a systemd service:
+#### Service Management
 
 ```bash
-# Enable auto-start
-sudo systemctl enable mantisdb
-
 # Start service
 sudo systemctl start mantisdb
+
+# Stop service
+sudo systemctl stop mantisdb
+
+# Restart service
+sudo systemctl restart mantisdb
 
 # Check status
 sudo systemctl status mantisdb
@@ -258,232 +386,160 @@ sudo systemctl status mantisdb
 # View logs
 sudo journalctl -u mantisdb -f
 
-# Stop service
-sudo systemctl stop mantisdb
+# Enable auto-start on boot
+sudo systemctl enable mantisdb
 
-# Restart service
-sudo systemctl restart mantisdb
+# Disable auto-start
+sudo systemctl disable mantisdb
 ```
-
-### Launchd (macOS)
-
-```bash
-# Enable auto-start
-sudo launchctl load /Library/LaunchDaemons/com.mantisdb.plist
-
-# Start service
-sudo launchctl start com.mantisdb
-
-# Stop service
-sudo launchctl stop com.mantisdb
-
-# View logs
-tail -f /var/log/mantisdb/mantisdb.log
-```
-
-### Windows Service
-
-```powershell
-# Install as Windows service
-sc create MantisDB binPath= "C:\Program Files\MantisDB\mantisdb.exe --config=C:\ProgramData\MantisDB\config.yaml"
-
-# Start service
-sc start MantisDB
-
-# Stop service
-sc stop MantisDB
-
-# Delete service
-sc delete MantisDB
-```
-
-## 🌐 Kubernetes Deployment
-
-### Namespace and ConfigMap
-
-```yaml
-# namespace.yaml
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: mantisdb
 
 ---
-# configmap.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: mantisdb-config
-  namespace: mantisdb
-data:
-  config.yaml: |
-    server:
-      port: 8080
-      admin_port: 8081
-      host: "0.0.0.0"
-    database:
-      data_dir: "/var/lib/mantisdb"
-      cache_size: "1GB"
-      buffer_size: "256MB"
-      use_cgo: false
-      sync_writes: true
-    security:
-      admin_token: "${MANTIS_ADMIN_TOKEN}"
-    logging:
-      level: "info"
-      format: "json"
+
+## Building from Source
+
+### Prerequisites
+
+- **Go**: 1.21 or later
+- **Node.js**: 18 or later
+- **npm**: 9 or later
+- **Git**: 2.0 or later
+- **Make**: GNU Make 4.0 or later
+
+### Build Steps
+
+```bash
+# Clone the repository
+git clone https://github.com/mantisdb/mantisdb.git
+cd mantisdb
+
+# Install dependencies
+make deps
+
+# Build for current platform
+make build
+
+# Or build for all platforms
+make cross-platform
+
+# Create installers
+make installers
+
+# Full production build
+make production
 ```
 
-### Secret
+### Build Options
 
-```yaml
-# secret.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: mantisdb-secret
-  namespace: mantisdb
-type: Opaque
-data:
-  admin-token: <base64-encoded-token>
+```bash
+# Build with specific version
+make build VERSION=1.2.3
+
+# Build without frontend
+make build SKIP_FRONTEND=true
+
+# Build with CGO enabled
+CGO_ENABLED=1 make build
+
+# Build with custom flags
+make build LDFLAGS="-X main.CustomFlag=value"
 ```
-
-### StatefulSet
-
-```yaml
-# statefulset.yaml
-apiVersion: apps/v1
-kind: StatefulSet
-metadata:
-  name: mantisdb
-  namespace: mantisdb
-spec:
-  serviceName: mantisdb
-  replicas: 1
-  selector:
-    matchLabels:
-      app: mantisdb
-  template:
-    metadata:
-      labels:
-        app: mantisdb
-    spec:
-      containers:
-      - name: mantisdb
-        image: mantisdb/mantisdb:latest
-        ports:
-        - containerPort: 8080
-          name: api
-        - containerPort: 8081
-          name: admin
-        env:
-        - name: MANTIS_ADMIN_TOKEN
-          valueFrom:
-            secretKeyRef:
-              name: mantisdb-secret
-              key: admin-token
-        volumeMounts:
-        - name: data
-          mountPath: /var/lib/mantisdb
-        - name: config
-          mountPath: /etc/mantisdb
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 30
-          periodSeconds: 10
-        readinessProbe:
-          httpGet:
-            path: /health
-            port: 8080
-          initialDelaySeconds: 5
-          periodSeconds: 5
-        resources:
-          requests:
-            memory: "1Gi"
-            cpu: "500m"
-          limits:
-            memory: "4Gi"
-            cpu: "2"
-      volumes:
-      - name: config
-        configMap:
-          name: mantisdb-config
-  volumeClaimTemplates:
-  - metadata:
-      name: data
-    spec:
-      accessModes: ["ReadWriteOnce"]
-      resources:
-        requests:
-          storage: 10Gi
-```
-
-### Service
-
-```yaml
-# service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: mantisdb
-  namespace: mantisdb
-spec:
-  selector:
-    app: mantisdb
-  ports:
-  - name: api
-    port: 8080
-    targetPort: 8080
-  - name: admin
-    port: 8081
-    targetPort: 8081
-  type: ClusterIP
 
 ---
-# ingress.yaml (optional)
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: mantisdb-ingress
-  namespace: mantisdb
-  annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-spec:
-  rules:
-  - host: mantisdb.yourdomain.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: mantisdb
-            port:
-              number: 8081
-  - host: api.mantisdb.yourdomain.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: mantisdb
-            port:
-              number: 8080
+
+## Configuration
+
+### Configuration File
+
+MantisDB uses YAML for configuration. Default locations:
+
+- **Linux**: `/etc/mantisdb/config.yaml`
+- **macOS**: `/usr/local/etc/mantisdb/config.yaml` or `~/.mantisdb/config.yaml`
+- **Windows**: `C:\ProgramData\MantisDB\config.yaml`
+
+### Example Configuration
+
+```yaml
+# Server settings
+server:
+  port: 8080              # Main database port
+  admin_port: 8081        # Admin dashboard port
+  host: "0.0.0.0"         # Bind address (use 127.0.0.1 for local only)
+  
+  # TLS configuration (optional)
+  tls:
+    enabled: false
+    cert_file: "/path/to/cert.pem"
+    key_file: "/path/to/key.pem"
+
+# Storage settings
+storage:
+  data_dir: "/var/lib/mantisdb"
+  engine: "auto"          # auto, cgo, pure
+  sync_writes: true       # Ensure durability
+  
+  # Backup configuration
+  backup:
+    enabled: true
+    interval: "1h"
+    retention: "168h"     # 7 days
+
+# Logging settings
+logging:
+  level: "info"           # debug, info, warn, error
+  format: "json"          # json, text
+  file: "/var/log/mantisdb/mantisdb.log"
+  max_size: 100           # MB
+  max_backups: 10
+  max_age: 30             # days
+
+# Cache settings
+cache:
+  size: 268435456         # 256MB in bytes
+  eviction_policy: "lru"  # lru, lfu
+
+# Security settings
+security:
+  admin_token: ""         # Set for production
+  enable_cors: false
+  cors_origins:
+    - "http://localhost:3000"
+  
+  # Authentication
+  auth:
+    enabled: false
+    jwt_secret: "change-this-in-production"
+    token_expiry: "24h"
+
+# Performance tuning
+performance:
+  max_connections: 1000
+  read_timeout: "30s"
+  write_timeout: "30s"
+  idle_timeout: "120s"
 ```
 
-Deploy with:
+### Environment Variables
+
+You can override configuration with environment variables:
+
 ```bash
-kubectl apply -f namespace.yaml
-kubectl apply -f configmap.yaml
-kubectl apply -f secret.yaml
-kubectl apply -f statefulset.yaml
-kubectl apply -f service.yaml
+# Server settings
+export MANTISDB_PORT=8080
+export MANTISDB_ADMIN_PORT=8081
+export MANTISDB_HOST=0.0.0.0
+
+# Storage settings
+export MANTISDB_DATA_DIR=/var/lib/mantisdb
+export MANTISDB_ENGINE=auto
+
+# Logging
+export MANTISDB_LOG_LEVEL=info
+export MANTISDB_LOG_FILE=/var/log/mantisdb/mantisdb.log
 ```
 
-## 🔍 Verification
+---
+
+## Verification
 
 ### Check Installation
 
@@ -491,193 +547,163 @@ kubectl apply -f service.yaml
 # Check version
 mantisdb --version
 
-# Check help
-mantisdb --help
+# Validate configuration
+mantisdb --config=/path/to/config.yaml --validate
 
-# Test configuration
-mantisdb --config=/etc/mantisdb/config.yaml --help
+# Test connection
+mantisdb --test-connection
 ```
+
+### Access Admin Dashboard
+
+After starting MantisDB, access the admin dashboard:
+
+```
+http://localhost:8081
+```
+
+Default credentials (if authentication is enabled):
+- **Username**: admin
+- **Password**: (set in config or first-run setup)
 
 ### Health Check
 
 ```bash
-# Start MantisDB
-mantisdb &
+# Check health endpoint
+curl http://localhost:8081/health
 
-# Wait a moment for startup
-sleep 5
-
-# Check health
-curl http://localhost:8080/health
-
-# Check admin dashboard
-curl http://localhost:8081
-
-# Stop MantisDB
-pkill mantisdb
-```
-
-### Service Status
-
-```bash
-# Systemd
-sudo systemctl status mantisdb
-
-# Docker
-docker ps | grep mantisdb
-docker logs mantisdb
-
-# Kubernetes
-kubectl get pods -n mantisdb
-kubectl logs -n mantisdb mantisdb-0
-```
-
-## 🚨 Troubleshooting
-
-### Common Issues
-
-#### Port Already in Use
-```bash
-# Check what's using the port
-sudo lsof -i :8080
-sudo lsof -i :8081
-
-# Change ports in configuration
-# Edit /etc/mantisdb/config.yaml
-```
-
-#### Permission Denied
-```bash
-# Fix data directory permissions
-sudo chown -R mantisdb:mantisdb /var/lib/mantisdb
-sudo chmod 755 /var/lib/mantisdb
-
-# Fix binary permissions
-sudo chmod +x /usr/local/bin/mantisdb
-```
-
-#### Service Won't Start
-```bash
-# Check logs
-sudo journalctl -u mantisdb -f
-
-# Check configuration
-mantisdb --config=/etc/mantisdb/config.yaml --help
-
-# Test manually
-sudo -u mantisdb mantisdb --config=/etc/mantisdb/config.yaml
-```
-
-#### Docker Issues
-```bash
-# Check container logs
-docker logs mantisdb
-
-# Check container status
-docker inspect mantisdb
-
-# Restart container
-docker restart mantisdb
-```
-
-### Getting Help
-
-- **Logs**: Check service logs for error messages
-- **Configuration**: Validate YAML syntax
-- **Permissions**: Ensure proper file/directory permissions
-- **Network**: Check firewall and port availability
-- **Resources**: Monitor CPU, memory, and disk usage
-
-## 📚 Next Steps
-
-After installation:
-
-1. **Access Admin Dashboard**: http://localhost:8081
-2. **Set Admin Token**: `export MANTIS_ADMIN_TOKEN="your-token"`
-3. **Configure Backups**: Edit backup settings in config
-4. **Set up Monitoring**: Configure Prometheus/Grafana
-5. **Read Documentation**: Visit [docs.mantisdb.com](https://docs.mantisdb.com)
-
-## 🔄 Upgrading
-
-### Binary Upgrade
-
-```bash
-# Download new version
-curl -L https://github.com/mantisdb/mantisdb/releases/latest/download/mantisdb-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m).tar.gz | tar xz
-
-# Stop service
-sudo systemctl stop mantisdb
-
-# Backup data (recommended)
-sudo cp -r /var/lib/mantisdb /var/lib/mantisdb.backup
-
-# Install new version
-cd mantisdb-*
-sudo ./install.sh
-
-# Start service
-sudo systemctl start mantisdb
-```
-
-### Docker Upgrade
-
-```bash
-# Pull new image
-docker pull mantisdb/mantisdb:latest
-
-# Stop and remove old container
-docker stop mantisdb
-docker rm mantisdb
-
-# Start new container
-docker-compose up -d
-```
-
-### Kubernetes Upgrade
-
-```bash
-# Update image in StatefulSet
-kubectl set image statefulset/mantisdb mantisdb=mantisdb/mantisdb:latest -n mantisdb
-
-# Check rollout status
-kubectl rollout status statefulset/mantisdb -n mantisdb
-```
-
-## 🗑️ Uninstallation
-
-### Remove Binary Installation
-
-```bash
-# Stop service
-sudo systemctl stop mantisdb
-sudo systemctl disable mantisdb
-
-# Remove files
-sudo rm -f /usr/local/bin/mantisdb
-sudo rm -rf /etc/mantisdb
-sudo rm -f /etc/systemd/system/mantisdb.service
-
-# Remove data (optional)
-sudo rm -rf /var/lib/mantisdb
-
-# Remove user (optional)
-sudo userdel mantisdb
-```
-
-### Remove Docker Installation
-
-```bash
-# Stop and remove containers
-docker-compose down
-
-# Remove volumes (optional)
-docker volume rm mantisdb_mantisdb_data
-
-# Remove images
-docker rmi mantisdb/mantisdb:latest
+# Expected response
+{"status":"ok","version":"1.0.0","uptime":"1h23m45s"}
 ```
 
 ---
 
-For more detailed information, visit the [MantisDB Documentation](https://docs.mantisdb.com).
+## Troubleshooting
+
+### Common Issues
+
+#### Port Already in Use
+
+```bash
+# Check what's using the port
+# Linux/macOS
+sudo lsof -i :8080
+sudo lsof -i :8081
+
+# Windows
+netstat -ano | findstr :8080
+netstat -ano | findstr :8081
+
+# Solution: Change ports in config or stop conflicting service
+```
+
+#### Permission Denied
+
+```bash
+# Linux/macOS: Fix data directory permissions
+sudo chown -R mantisdb:mantisdb /var/lib/mantisdb
+sudo chown -R mantisdb:mantisdb /var/log/mantisdb
+
+# Or run as current user
+mantisdb --config=~/.mantisdb/config.yaml
+```
+
+#### Service Won't Start
+
+```bash
+# Check service status
+sudo systemctl status mantisdb
+
+# View logs
+sudo journalctl -u mantisdb -n 50
+
+# Check config syntax
+mantisdb --config=/etc/mantisdb/config.yaml --validate
+
+# Try running manually
+sudo -u mantisdb mantisdb --config=/etc/mantisdb/config.yaml
+```
+
+#### Connection Refused
+
+```bash
+# Check if MantisDB is running
+ps aux | grep mantisdb
+
+# Check firewall
+# Linux
+sudo ufw status
+sudo ufw allow 8080
+sudo ufw allow 8081
+
+# macOS
+sudo /usr/libexec/ApplicationFirewall/socketfilterfw --add /usr/local/bin/mantisdb
+
+# Windows
+netsh advfirewall firewall add rule name="MantisDB" dir=in action=allow protocol=TCP localport=8080
+netsh advfirewall firewall add rule name="MantisDB Admin" dir=in action=allow protocol=TCP localport=8081
+```
+
+### Getting Help
+
+- **Documentation**: https://mantisdb.com/docs
+- **GitHub Issues**: https://github.com/mantisdb/mantisdb/issues
+- **Community Forum**: https://github.com/mantisdb/mantisdb/discussions
+- **Email Support**: support@mantisdb.com
+
+### Uninstallation
+
+**Windows:**
+```powershell
+# Using installer
+.\uninstall.bat
+
+# Manual
+Remove-Item "C:\Program Files\MantisDB" -Recurse
+Remove-Item "C:\ProgramData\MantisDB" -Recurse
+```
+
+**macOS:**
+```bash
+# Homebrew
+brew services stop mantisdb
+brew uninstall mantisdb
+brew untap mantisdb/tap
+
+# Manual
+sudo rm /usr/local/bin/mantisdb
+rm -rf ~/.mantisdb
+```
+
+**Linux:**
+```bash
+# DEB
+sudo systemctl stop mantisdb
+sudo systemctl disable mantisdb
+sudo dpkg -r mantisdb
+
+# RPM
+sudo systemctl stop mantisdb
+sudo systemctl disable mantisdb
+sudo rpm -e mantisdb
+
+# Manual
+sudo systemctl stop mantisdb
+sudo systemctl disable mantisdb
+sudo rm /usr/local/bin/mantisdb
+sudo rm -rf /etc/mantisdb /var/lib/mantisdb /var/log/mantisdb
+```
+
+---
+
+## Next Steps
+
+After installation:
+
+1. **Configure MantisDB** for your use case
+2. **Start the service** or run manually
+3. **Access the admin dashboard** at http://localhost:8081
+4. **Install client libraries** for your programming language
+5. **Read the documentation** at https://mantisdb.com/docs
+
+For production deployments, see the [Production Deployment Guide](PRODUCTION.md).

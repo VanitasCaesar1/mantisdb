@@ -209,8 +209,6 @@ func (m *StartupManager) RegisterStartupFunc(name string, priority int, fn func(
 
 // Start executes all registered startup functions
 func (m *StartupManager) Start(ctx context.Context) error {
-	log.Println("Starting application...")
-
 	startupCtx, cancel := context.WithTimeout(ctx, m.timeout)
 	defer cancel()
 
@@ -220,18 +218,12 @@ func (m *StartupManager) Start(ctx context.Context) error {
 	m.mutex.Unlock()
 
 	for _, startupFunc := range funcs {
-		log.Printf("Starting: %s", startupFunc.Name)
-		start := time.Now()
-
 		if err := startupFunc.Func(startupCtx); err != nil {
 			log.Printf("Failed to start %s: %v", startupFunc.Name, err)
 			return fmt.Errorf("startup %s failed: %w", startupFunc.Name, err)
 		}
-
-		log.Printf("Successfully started %s (took %v)", startupFunc.Name, time.Since(start))
 	}
 
-	log.Println("Application startup completed successfully")
 	return nil
 }
 

@@ -1,0 +1,96 @@
+version: 1.0.0
+build:
+  platforms:
+    - linux/amd64
+    - linux/arm64
+    - darwin/amd64
+    - darwin/arm64
+    - windows/amd64
+  optimization:
+    level: size
+    cgo_enabled: false
+    build_flags:
+      - -trimpath
+    ldflags:
+      - -s
+      - -w
+    tags: []
+  frontend:
+    build_command: npm run build
+    output_dir: admin/frontend/dist
+    embed_path: admin/api/assets
+    node_version: "18"
+    skip_build: false
+  output:
+    directory: ./dist
+    binary_prefix: mantisdb
+    version_suffix: true
+    clean_before: true
+  parallel: true
+  timeout: 30m0s
+packaging:
+  compression:
+    level: 9
+    format: auto
+  installers:
+    unix:
+      systemd: true
+      homebrew: true
+      user_local: true
+    windows:
+      chocolatey: true
+      msi: false
+      service: true
+  assets:
+    include_docs: true
+    include_license: true
+    extra_files:
+      - README.md
+      - INSTALL.md
+    exclude_files:
+      - "*.log"
+      - "*.tmp"
+  checksums:
+    enabled: true
+    algorithms:
+      - sha256
+    format: standard
+distribution:
+  github:
+    repository: mantisdb/mantisdb
+    token: ""
+    draft: false
+    prerelease: false
+    release_notes: auto
+    tag_prefix: v
+  notifications:
+    webhook_url: ""
+    slack_channel: "#releases"
+    email_to: ""
+  security:
+    code_signing:
+      enabled: false
+      macos_identity: ""
+      windows_cert: ""
+      windows_pass: ""
+    verification:
+      dependency_check: true
+      reproducible_build: true
+      audit_log: true
+environment:
+  required_tools:
+    - go
+    - node
+    - npm
+    - gh
+  env_vars: {}
+  paths:
+    work_dir: .
+    temp_dir: /tmp/mantisdb-build
+    cache_dir: ./.build-cache
+    output_dir: ./dist
+  resources:
+    max_memory: 4GB
+    max_cpu: 0
+    disk_space: 10GB
+    build_timeout: 1h0m0s

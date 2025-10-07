@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
 	"runtime"
 	"strconv"
@@ -443,13 +445,43 @@ func (s *Server) Start(ctx context.Context) error {
 	// Health check
 	mux.HandleFunc("/health", s.handleHealth)
 
+	// Find an available port starting from the configured port
+	actualPort, err := findAvailablePort(s.port, 10)
+	if err != nil {
+		return fmt.Errorf("failed to find available API port: %v", err)
+	}
+
+	// Update port if different
+	if actualPort != s.port {
+		log.Printf("API port %d in use, using port %d instead", s.port, actualPort)
+		s.port = actualPort
+	}
+
 	s.server = &http.Server{
-		Addr:    fmt.Sprintf(":%d", s.port),
+		Addr:    fmt.Sprintf(":%d", actualPort),
 		Handler: s.corsMiddleware(s.versionMiddleware(s.loggingMiddleware(mux))),
 	}
 
-	fmt.Printf("Starting API server on port %d\n", s.port)
+	// Start server silently
 	return s.server.ListenAndServe()
+}
+
+// findAvailablePort tries to find an available port starting from the given port
+func findAvailablePort(startPort int, maxAttempts int) (int, error) {
+	for i := 0; i < maxAttempts; i++ {
+		port := startPort + i
+		addr := fmt.Sprintf(":%d", port)
+
+		// Try to listen on the port
+		listener, err := net.Listen("tcp", addr)
+		if err == nil {
+			// Port is available, close the listener and return
+			listener.Close()
+			return port, nil
+		}
+	}
+
+	return 0, fmt.Errorf("no available port found after %d attempts starting from %d", maxAttempts, startPort)
 }
 
 // Stop stops the HTTP server
@@ -458,6 +490,11 @@ func (s *Server) Stop(ctx context.Context) error {
 		return s.server.Shutdown(ctx)
 	}
 	return nil
+}
+
+// GetPort returns the actual port the server is running on
+func (s *Server) GetPort() int {
+	return s.port
 }
 
 // Key-Value API handlers

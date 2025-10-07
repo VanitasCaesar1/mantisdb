@@ -236,6 +236,8 @@ func (a *AdminAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		a.handleLogStream(w, r)
 	case path == "/api/system/stats" && method == "GET":
 		a.handleGetSystemStats(w, r)
+	case path == "/api/stats" && method == "GET":
+		a.handleGetSystemStats(w, r)
 
 	// Enhanced configuration endpoints
 	case path == "/api/config/validate" && method == "POST":

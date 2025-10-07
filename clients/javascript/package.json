@@ -1,12 +1,23 @@
 {
-  "name": "mantisdb-js",
+  "name": "@mantisdb/client",
   "version": "1.0.0",
   "description": "Official JavaScript/TypeScript client library for MantisDB",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "README.md",
+    "LICENSE"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mantisdb/mantisdb.git",
+    "directory": "clients/javascript"
+  },
+  "homepage": "https://github.com/mantisdb/mantisdb#readme",
+  "bugs": {
+    "url": "https://github.com/mantisdb/mantisdb/issues"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",

@@ -1,0 +1,64 @@
+[package]
+name = "mantisdb-core"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "mantisdb_core"
+crate-type = ["cdylib", "staticlib"]
+
+[dependencies]
+# Lock-free data structures
+crossbeam = "0.8"
+crossbeam-skiplist = "0.1"
+parking_lot = "0.12"
+
+# Serialization (zero-copy)
+rkyv = { version = "0.7", features = ["validation"] }
+bytecheck = "0.6"
+
+# Memory management
+mimalloc = { version = "0.1", default-features = false }
+
+# Hashing
+ahash = "0.8"
+xxhash-rust = { version = "0.8", features = ["xxh3"] }
+
+# Async runtime (optional for background tasks)
+tokio = { version = "1", features = ["rt", "sync", "time"], optional = true }
+
+# Memory mapping
+memmap2 = "0.9"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Atomic operations
+atomic = "0.6"
+
+# FFI
+libc = "0.2"
+lazy_static = "1.4"
+
+[dev-dependencies]
+criterion = "0.5"
+proptest = "1.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.bench]
+inherits = "release"
+
+[[bench]]
+name = "storage_bench"
+harness = false
+
+[[bench]]
+name = "cache_bench"
+harness = false

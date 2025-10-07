@@ -30,8 +30,7 @@ sudo ./install.sh
 # Download from releases page and run install.ps1 as Administrator
 ```
 
-### Docker
-
+**Docker:**
 ```bash
 docker run -d \
   --name mantisdb \
@@ -41,13 +40,7 @@ docker run -d \
   mantisdb/mantisdb:latest
 ```
 
-### Build from Source
-
-```bash
-git clone https://github.com/mantisdb/mantisdb.git
-cd mantisdb
-make production
-```
+> **Full Installation Guide**: See [docs/getting-started/installation.md](docs/getting-started/installation.md) for complete installation instructions including Kubernetes, package managers, and more.
 
 ## 🎯 Quick Start
 
@@ -453,13 +446,24 @@ make run-dev
 
 MIT License - see [LICENSE](LICENSE) file for details.
 
+## 📚 Documentation
+
+Complete documentation is available in the [docs/](docs/) directory:
+
+- **[Getting Started](docs/getting-started/)** - Installation and quick start guides
+- **[Architecture](docs/architecture/)** - System design and components
+- **[API Reference](docs/api/)** - REST API documentation
+- **[Client Libraries](docs/clients/)** - Go, Python, and JavaScript clients
+- **[Performance](docs/performance/)** - Benchmarks and optimization
+- **[Development](docs/development/)** - Building, testing, and contributing
+
 ## 🆘 Support
 
-- **Documentation**: [docs.mantisdb.com](https://docs.mantisdb.com)
+- **Documentation**: [docs/](docs/)
 - **Issues**: [GitHub Issues](https://github.com/mantisdb/mantisdb/issues)
 - **Discussions**: [GitHub Discussions](https://github.com/mantisdb/mantisdb/discussions)
 - **Enterprise Support**: enterprise@mantisdb.com
 
 ---
 
-**Ready to get started?** Download the latest release and follow our [Quick Start Guide](https://docs.mantisdb.com/quickstart).
+**Ready to get started?** See the [Installation Guide](docs/getting-started/installation.md) and [Quick Start Guide](docs/getting-started/quickstart.md).

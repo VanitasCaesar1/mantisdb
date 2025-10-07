@@ -1,6 +1,7 @@
 {
   "name": "mantisdb-admin",
   "version": "1.0.0",
+  "type": "module",
   "description": "MantisDB Admin Dashboard",
   "private": true,
   "scripts": {

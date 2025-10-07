@@ -148,15 +148,15 @@ export function formatConnectionString(config: ClientConfig): string {
   // Add query parameters for non-default values
   const params = new URLSearchParams();
   
-  if (config.timeout !== 60000) {
+  if (config.timeout !== undefined && config.timeout !== 60000) {
     params.set('timeout', config.timeout.toString());
   }
 
-  if (config.retryAttempts !== 3) {
+  if (config.retryAttempts !== undefined && config.retryAttempts !== 3) {
     params.set('retryAttempts', config.retryAttempts.toString());
   }
 
-  if (config.maxConnections !== 10) {
+  if (config.maxConnections !== undefined && config.maxConnections !== 10) {
     params.set('maxConnections', config.maxConnections.toString());
   }
 

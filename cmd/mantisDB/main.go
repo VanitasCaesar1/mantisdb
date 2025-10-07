@@ -6,14 +6,16 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
 	"time"
 
-	"mantisDB/admin_api"
+	adminapi "mantisDB/admin/api"
 	"mantisDB/api"
 	"mantisDB/benchmark"
 	"mantisDB/cache"
@@ -66,20 +68,21 @@ func PrintVersion() {
 
 // LegacyConfig holds legacy command line configuration
 type LegacyConfig struct {
-	DataDir       string
-	Port          int
-	AdminPort     int
-	UseCGO        bool
-	CacheSize     int64
-	BufferSize    int64
-	LogLevel      string
-	EnableAPI     bool
-	EnableCLI     bool
-	EnableAdmin   bool
-	RunBenchmark  bool
-	BenchmarkOnly bool
-	ShowVersion   bool
-	ShowHelp      bool
+	DataDir         string
+	Port            int
+	AdminPort       int
+	UseCGO          bool
+	CacheSize       int64
+	BufferSize      int64
+	LogLevel        string
+	EnableAPI       bool
+	EnableCLI       bool
+	EnableAdmin     bool
+	RunBenchmark    bool
+	BenchmarkOnly   bool
+	BenchmarkStress string
+	ShowVersion     bool
+	ShowHelp        bool
 }
 
 // MantisDB represents the main database instance
@@ -188,6 +191,7 @@ func parseFlags() *LegacyConfig {
 	flag.BoolVar(&legacyConfig.EnableAdmin, "enable-admin", true, "Enable admin dashboard")
 	flag.BoolVar(&legacyConfig.RunBenchmark, "benchmark", false, "Run benchmarks after startup")
 	flag.BoolVar(&legacyConfig.BenchmarkOnly, "benchmark-only", false, "Run benchmarks and exit")
+	flag.StringVar(&legacyConfig.BenchmarkStress, "benchmark-stress", "", "Benchmark stress level (light, medium, heavy, extreme)")
 	flag.BoolVar(&legacyConfig.ShowVersion, "version", false, "Show version information")
 	flag.BoolVar(&legacyConfig.ShowHelp, "help", false, "Show help information")
 
@@ -293,6 +297,29 @@ func NewMantisDB(cfg *config.Config, legacyConfig *LegacyConfig) (*MantisDB, err
 	return db, nil
 }
 
+// findAvailablePort tries to find an available port starting from the given port
+func findAvailablePort(startPort int, maxAttempts int) (int, error) {
+	return findAvailablePortWithIncrement(startPort, maxAttempts, 1)
+}
+
+// findAvailablePortWithIncrement tries to find an available port with custom increment
+func findAvailablePortWithIncrement(startPort int, maxAttempts int, increment int) (int, error) {
+	for i := 0; i < maxAttempts; i++ {
+		port := startPort + (i * increment)
+		addr := fmt.Sprintf(":%d", port)
+		
+		// Try to listen on the port
+		listener, err := net.Listen("tcp", addr)
+		if err == nil {
+			// Port is available, close the listener and return
+			listener.Close()
+			return port, nil
+		}
+	}
+	
+	return 0, fmt.Errorf("no available port found after %d attempts starting from %d", maxAttempts, startPort)
+}
+
 // startAdminServer starts the admin dashboard server with embedded assets
 func (db *MantisDB) startAdminServer(ctx context.Context) error {
 	// Import admin API package
@@ -307,25 +334,56 @@ func (db *MantisDB) startAdminServer(ctx context.Context) error {
 	// Mount admin API with authentication
 	mux.Handle("/api/", authMiddleware(adminAPI))
 
-	// Serve static files from filesystem (fallback when embed not available)
-	assetsDir := "../../admin/assets/dist"
-	if _, err := os.Stat(assetsDir); os.IsNotExist(err) {
-		assetsDir = "admin/assets/dist" // Try relative to root
+	// Try to use embedded assets first
+	if adminapi.AssetsAvailable() {
+		log.Printf("Using embedded admin dashboard assets")
+		// Serve embedded static files
+		fileServer := http.FileServer(adminapi.GetAssetsFS())
+		mux.Handle("/", fileServer)
+	} else {
+		// Fallback: try filesystem
+		assetsDir := "admin/api/assets/dist"
+		if _, err := os.Stat(filepath.Join(assetsDir, "index.html")); os.IsNotExist(err) {
+			// Try alternative path
+			assetsDir = "admin/assets/dist"
+			if _, err := os.Stat(filepath.Join(assetsDir, "index.html")); os.IsNotExist(err) {
+				log.Printf("Warning: admin assets not found, admin UI will not be available")
+				// Serve a simple message
+				mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+					w.Header().Set("Content-Type", "text/html")
+					fmt.Fprintf(w, `<html><body><h1>MantisDB Admin</h1><p>Admin UI assets not found. Build with: make build<br>API is available at <a href="/api/">/api/</a></p></body></html>`)
+				})
+			} else {
+				log.Printf("Using filesystem admin dashboard assets from: %s", assetsDir)
+				mux.Handle("/", http.FileServer(http.Dir(assetsDir)))
+			}
+		} else {
+			log.Printf("Using filesystem admin dashboard assets from: %s", assetsDir)
+			mux.Handle("/", http.FileServer(http.Dir(assetsDir)))
+		}
 	}
 
-	// Serve static files
-	mux.Handle("/", http.FileServer(http.Dir(assetsDir)))
+	// Find an available port starting from the configured port
+	// Use increment of 2 to avoid collision with API server (which uses +1, +2, +3...)
+	adminPort, err := findAvailablePortWithIncrement(db.config.Server.AdminPort, 10, 2)
+	if err != nil {
+		return fmt.Errorf("failed to find available admin port: %v", err)
+	}
+	
+	// Update config with actual port
+	if adminPort != db.config.Server.AdminPort {
+		log.Printf("Admin port %d in use, using port %d instead", db.config.Server.AdminPort, adminPort)
+		db.config.Server.AdminPort = adminPort
+	}
 
 	// Create server with timeouts and security headers
 	db.adminServer = &http.Server{
-		Addr:         fmt.Sprintf(":%d", db.config.Server.AdminPort),
+		Addr:         fmt.Sprintf(":%d", adminPort),
 		Handler:      db.addSecurityHeaders(mux),
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  120 * time.Second,
 	}
-
-	fmt.Printf("Admin dashboard starting on port %d\n", db.config.Server.AdminPort)
 
 	// Start server
 	if err := db.adminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -374,11 +432,7 @@ func (db *MantisDB) GetStats() map[string]interface{} {
 
 // startCLI starts the command line interface
 func (db *MantisDB) startCLI(ctx context.Context) {
-	fmt.Println("CLI interface available.")
-	fmt.Printf("API endpoints available at http://localhost:%d/api/v1/\n", db.config.Server.Port)
-	fmt.Println("Available endpoints:")
-	fmt.Println("  GET  /api/v1/stats")
-	fmt.Println("  GET  /health")
+	// CLI is ready, no need for verbose output
 }
 
 // healthCheck performs a health check on the database
@@ -428,19 +482,62 @@ func (db *MantisDB) runBenchmarks(ctx context.Context) {
 	fmt.Println("Waiting for system to initialize before running benchmarks...")
 	time.Sleep(time.Second * 3)
 
-	benchmarkSuite := benchmark.NewBenchmarkSuite(db.store)
+	// Determine stress level based on configuration
+	stressLevel := "medium"
+	if db.legacyConfig.BenchmarkStress != "" {
+		stressLevel = db.legacyConfig.BenchmarkStress
+	} else if db.legacyConfig.BenchmarkOnly {
+		stressLevel = "heavy" // More intensive for benchmark-only mode
+	}
 
-	results, err := benchmarkSuite.RunAllBenchmarks(ctx)
+	config := benchmark.GetStressTestConfig(stressLevel)
+	benchmarkSuite := benchmark.NewProductionBenchmarkSuite(db.store, config)
+
+	// Run production benchmarks with scoring
+	score, err := benchmarkSuite.RunProductionBenchmarks(ctx)
 	if err != nil {
-		log.Printf("Benchmark failed: %v", err)
+		log.Printf("Production benchmark failed: %v", err)
+
+		// Fallback to legacy benchmarks
+		fmt.Println("Falling back to legacy benchmarks...")
+		results, legacyErr := benchmarkSuite.RunAllBenchmarks(ctx)
+		if legacyErr != nil {
+			log.Printf("Legacy benchmark also failed: %v", legacyErr)
+			return
+		}
+
+		benchmarkSuite.PrintResults(results)
+		benchmarkSuite.SaveResults(results, "benchmark_results.json")
 		return
 	}
 
-	benchmarkSuite.PrintResults(results)
-	benchmarkSuite.SaveResults(results, "benchmark_results.json")
+	// Print comprehensive results
+	fmt.Printf("\n=== MANTISDB PRODUCTION BENCHMARK RESULTS ===\n")
+	fmt.Printf("Overall Score: %.2f/100 (%s)\n", score.OverallScore, score.Grade)
+	fmt.Printf("Test Environment: %s stress level\n", score.TestEnvironment.StressLevel)
+	fmt.Printf("Total Operations: %d\n", score.TestEnvironment.TotalOperations)
+	fmt.Printf("Data Processed: %.2f MB\n", score.TestEnvironment.DataProcessedMB)
+	fmt.Printf("System: %s on %s (%d CPUs, %d MB RAM)\n",
+		score.SystemInfo.OS, score.SystemInfo.Architecture,
+		score.SystemInfo.CPUs, score.SystemInfo.Memory)
+
+	fmt.Printf("\nCategory Scores:\n")
+	for category, categoryScore := range score.CategoryScores {
+		fmt.Printf("  %s: %.2f/100\n", category, categoryScore)
+	}
+
+	if len(score.Recommendations) > 0 {
+		fmt.Printf("\nRecommendations:\n")
+		for _, rec := range score.Recommendations {
+			fmt.Printf("  • %s\n", rec)
+		}
+	}
+
+	// Save detailed results
+	benchmarkSuite.SaveBenchmarkScore(score, "production_benchmark_results.json")
 
 	if db.legacyConfig.BenchmarkOnly {
-		fmt.Println("Benchmarks complete. Exiting...")
+		fmt.Println("\nProduction benchmarks complete. Exiting...")
 		// Signal shutdown
 		go func() {
 			time.Sleep(time.Second)
@@ -453,7 +550,7 @@ func (db *MantisDB) runBenchmarks(ctx context.Context) {
 
 // createAdminAPI creates and configures the admin API handler
 func (db *MantisDB) createAdminAPI() http.Handler {
-	return admin_api.NewAdminAPI(db.store)
+	return adminapi.NewAdminAPI(db.store)
 }
 
 // createAuthMiddleware creates authentication middleware for admin dashboard
@@ -539,10 +636,8 @@ func (db *MantisDB) registerHealthChecks() {
 func (db *MantisDB) registerStartupFunctions() {
 	// 1. Initialize storage engine (highest priority)
 	db.startupManager.RegisterStartupFunc("storage", 1, func(ctx context.Context) error {
-		fmt.Printf("Starting MantisDB...\n")
-		fmt.Printf("Data Directory: %s\n", db.config.Database.DataDir)
-		fmt.Printf("Storage Engine: %s\n", db.getStorageEngineType())
-		fmt.Printf("Cache Size: %s\n", db.config.Database.CacheSize)
+		// Only show minimal startup info
+		fmt.Printf("Starting MantisDB %s...\n", Version)
 
 		// Create data directory if it doesn't exist
 		if err := os.MkdirAll(db.config.Database.DataDir, 0755); err != nil {
@@ -563,8 +658,8 @@ func (db *MantisDB) registerStartupFunctions() {
 		return nil
 	})
 
-	// 3. Start API server
-	if db.legacyConfig.EnableAPI {
+	// 3. Start API server (skip in benchmark-only mode)
+	if db.legacyConfig.EnableAPI && !db.legacyConfig.BenchmarkOnly {
 		db.startupManager.RegisterStartupFunc("api", 3, func(ctx context.Context) error {
 			go func() {
 				if err := db.apiServer.Start(ctx); err != nil {
@@ -575,8 +670,8 @@ func (db *MantisDB) registerStartupFunctions() {
 		})
 	}
 
-	// 4. Start admin dashboard
-	if db.legacyConfig.EnableAdmin {
+	// 4. Start admin dashboard (skip in benchmark-only mode)
+	if db.legacyConfig.EnableAdmin && !db.legacyConfig.BenchmarkOnly {
 		db.startupManager.RegisterStartupFunc("admin", 4, func(ctx context.Context) error {
 			go func() {
 				if err := db.startAdminServer(ctx); err != nil {
@@ -611,11 +706,23 @@ func (db *MantisDB) registerStartupFunctions() {
 		})
 	}
 
-	// 8. Final startup message
+	// 8. Final startup message (with delay to ensure ports are selected)
 	db.startupManager.RegisterStartupFunc("startup-complete", 8, func(ctx context.Context) error {
-		fmt.Println("MantisDB started successfully")
-		if db.legacyConfig.EnableAdmin {
-			fmt.Printf("Admin dashboard available at http://%s\n", db.config.GetAdminAddr())
+		// Wait a moment for servers to start and select ports
+		if !db.legacyConfig.BenchmarkOnly {
+			time.Sleep(500 * time.Millisecond)
+		}
+		
+		if db.legacyConfig.BenchmarkOnly {
+			fmt.Printf("✓ MantisDB initialized for benchmarking\n")
+		} else {
+			fmt.Printf("✓ MantisDB started successfully\n")
+			if db.legacyConfig.EnableAdmin {
+				fmt.Printf("  Admin: http://localhost:%d\n", db.config.Server.AdminPort)
+			}
+			if db.legacyConfig.EnableAPI {
+				fmt.Printf("  API:   http://localhost:%d/api/v1/\n", db.apiServer.GetPort())
+			}
 		}
 		return nil
 	})
