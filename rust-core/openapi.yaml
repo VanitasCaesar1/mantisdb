@@ -1,0 +1,1436 @@
+openapi: 3.0.3
+info:
+  title: MantisDB Admin API
+  description: |
+    Comprehensive REST API for MantisDB administration, monitoring, and management.
+    
+    ## Features
+    - **Health & Monitoring**: Real-time metrics, stats, and system health
+    - **Authentication**: Secure JWT-based authentication with RBAC
+    - **Tables**: Full CRUD operations on database tables
+    - **Queries**: SQL query execution with history tracking
+    - **RLS**: Row-Level Security policy management
+    - **Logs**: Searchable logs with streaming support
+    - **Backups**: Automated backup and restore operations
+    - **Config**: Runtime configuration management
+    - **WebSocket/SSE**: Real-time event streams
+    
+  version: 1.0.0
+  contact:
+    name: MantisDB Team
+    url: https://github.com/mantisdb
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8081
+    description: Local development server
+  - url: http://localhost:8080
+    description: API server
+
+tags:
+  - name: Health & Monitoring
+    description: System health checks, metrics, and monitoring endpoints
+  - name: Authentication
+    description: User authentication and authorization
+  - name: Tables
+    description: Database table management and CRUD operations
+  - name: Queries
+    description: SQL query execution and history
+  - name: RLS
+    description: Row-Level Security policy management
+  - name: Logs
+    description: System logs and audit trails
+  - name: Backups
+    description: Backup and restore operations
+  - name: Configuration
+    description: Runtime configuration management
+  - name: Streams
+    description: Real-time event streams (SSE)
+
+paths:
+  # Health & Monitoring
+  /api/health:
+    get:
+      tags: [Health & Monitoring]
+      summary: Health check
+      description: Returns the health status of the database system
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+  
+  /api/metrics:
+    get:
+      tags: [Health & Monitoring]
+      summary: Get metrics
+      description: Returns current system metrics
+      responses:
+        '200':
+          description: Current metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Metrics'
+  
+  /api/metrics/detailed:
+    get:
+      tags: [Health & Monitoring]
+      summary: Get detailed metrics
+      description: Returns comprehensive system metrics with breakdowns
+      responses:
+        '200':
+          description: Detailed metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailedMetrics'
+  
+  /api/metrics/prometheus:
+    get:
+      tags: [Health & Monitoring]
+      summary: Prometheus metrics
+      description: Returns metrics in Prometheus format
+      responses:
+        '200':
+          description: Prometheus format metrics
+          content:
+            text/plain:
+              schema:
+                type: string
+  
+  /api/stats:
+    get:
+      tags: [Health & Monitoring]
+      summary: System statistics
+      description: Returns overall system statistics
+      responses:
+        '200':
+          description: System statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemStats'
+  
+  # Authentication
+  /api/auth/login:
+    post:
+      tags: [Authentication]
+      summary: User login
+      description: Authenticate user and return JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '401':
+          description: Invalid credentials
+  
+  /api/auth/logout:
+    post:
+      tags: [Authentication]
+      summary: User logout
+      description: Invalidate the current session
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logout successful
+  
+  /api/auth/verify:
+    get:
+      tags: [Authentication]
+      summary: Verify token
+      description: Verify the validity of a JWT token
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Token is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenVerification'
+        '401':
+          description: Invalid token
+  
+  /api/auth/create-user:
+    post:
+      tags: [Authentication]
+      summary: Create user
+      description: Create a new user account
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created successfully
+        '400':
+          description: Invalid request
+        '403':
+          description: Insufficient permissions
+  
+  /api/auth/change-password:
+    post:
+      tags: [Authentication]
+      summary: Change password
+      description: Change the current user's password
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangePasswordRequest'
+      responses:
+        '200':
+          description: Password changed successfully
+        '400':
+          description: Invalid request
+  
+  /api/auth/update-profile:
+    put:
+      tags: [Authentication]
+      summary: Update profile
+      description: Update the current user's profile
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProfileRequest'
+      responses:
+        '200':
+          description: Profile updated successfully
+
+  /api/auth/first-run/status:
+    get:
+      tags: [Authentication]
+      summary: First run status
+      description: Returns whether initial admin setup is required
+      responses:
+        '200':
+          description: First run status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirstRunStatus'
+
+  /api/auth/first-run/create:
+    post:
+      tags: [Authentication]
+      summary: Create initial admin
+      description: Create the initial admin user when no users exist
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FirstRunCreateRequest'
+      responses:
+        '200':
+          description: Initial admin created
+  
+  # Tables
+  /api/tables:
+    get:
+      tags: [Tables]
+      summary: List tables
+      description: Get a list of all tables in the database
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of tables
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TableInfo'
+  
+  /api/tables/create:
+    post:
+      tags: [Tables]
+      summary: Create table
+      description: Create a new table
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTableRequest'
+      responses:
+        '201':
+          description: Table created successfully
+        '400':
+          description: Invalid request
+  
+  /api/tables/{table}:
+    get:
+      tags: [Tables]
+      summary: Get table data
+      description: Retrieve all data from a specific table
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: Table data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableData'
+
+  /api/tables/{table}/schema:
+    get:
+      tags: [Tables]
+      summary: Get table schema
+      description: Returns the schema (columns) for a table
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Table schema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TableSchema'
+    put:
+      tags: [Tables]
+      summary: Update table schema
+      description: Updates the schema (columns) for a table
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSchemaRequest'
+      responses:
+        '200':
+          description: Schema updated
+  
+  /api/tables/{table}/data:
+    post:
+      tags: [Tables]
+      summary: Insert row
+      description: Insert a new row into the table
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '201':
+          description: Row created successfully
+        '400':
+          description: Invalid request
+  
+  /api/tables/{table}/data/{id}:
+    get:
+      tags: [Tables]
+      summary: Get row
+      description: Retrieve a specific row by ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Row data
+          content:
+            application/json:
+              schema:
+                type: object
+    
+    put:
+      tags: [Tables]
+      summary: Update row
+      description: Update an existing row
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: Row updated successfully
+    
+    delete:
+      tags: [Tables]
+      summary: Delete row
+      description: Delete a specific row
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: table
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Row deleted successfully
+  
+  # Queries
+  /api/query:
+    post:
+      tags: [Queries]
+      summary: Execute query
+      description: Execute a SQL query
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueryRequest'
+      responses:
+        '200':
+          description: Query results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueryResponse'
+        '400':
+          description: Invalid query
+  
+  /api/query/history:
+    get:
+      tags: [Queries]
+      summary: Query history
+      description: Get the history of executed queries
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+      responses:
+        '200':
+          description: Query history
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/QueryHistoryItem'
+
+  # Columnar
+  /api/columnar/cql:
+    post:
+      tags: [Tables]
+      summary: Execute CQL
+      description: Execute a CQL statement against the columnar store
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CqlRequest'
+      responses:
+        '200':
+          description: CQL response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CqlResponse'
+  
+  # RLS (Row-Level Security)
+  /api/rls/enable:
+    post:
+      tags: [RLS]
+      summary: Enable RLS
+      description: Enable Row-Level Security for a table
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RlsEnableRequest'
+      responses:
+        '200':
+          description: RLS enabled successfully
+  
+  /api/rls/disable:
+    post:
+      tags: [RLS]
+      summary: Disable RLS
+      description: Disable Row-Level Security for a table
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RlsDisableRequest'
+      responses:
+        '200':
+          description: RLS disabled successfully
+  
+  /api/rls/status:
+    get:
+      tags: [RLS]
+      summary: RLS status
+      description: Get RLS status for all tables
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: RLS status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RlsStatus'
+  
+  /api/rls/policies:
+    get:
+      tags: [RLS]
+      summary: List policies
+      description: List all RLS policies
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: table
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of policies
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/RlsPolicy'
+  
+  /api/rls/policies/add:
+    post:
+      tags: [RLS]
+      summary: Add policy
+      description: Add a new RLS policy
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddPolicyRequest'
+      responses:
+        '201':
+          description: Policy added successfully
+  
+  /api/rls/policies/remove:
+    post:
+      tags: [RLS]
+      summary: Remove policy
+      description: Remove an RLS policy
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RemovePolicyRequest'
+      responses:
+        '200':
+          description: Policy removed successfully
+  
+  /api/rls/check:
+    post:
+      tags: [RLS]
+      summary: Check permission
+      description: Check if a user has permission to access data
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckPermissionRequest'
+      responses:
+        '200':
+          description: Permission check result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PermissionCheckResult'
+  
+  # Logs
+  /api/logs:
+    get:
+      tags: [Logs]
+      summary: Get logs
+      description: Retrieve system logs
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [DEBUG, INFO, WARN, ERROR]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            default: 0
+      responses:
+        '200':
+          description: System logs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogEntry'
+  
+  /api/logs/search:
+    post:
+      tags: [Logs]
+      summary: Search logs
+      description: Search logs with advanced filters
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LogSearchRequest'
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LogEntry'
+  
+  /api/logs/stream:
+    get:
+      tags: [Logs]
+      summary: Stream logs
+      description: Stream logs in real-time (SSE)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Log stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+  
+  # Backups
+  /api/backups:
+    get:
+      tags: [Backups]
+      summary: List backups
+      description: Get a list of all available backups
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: List of backups
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BackupInfo'
+    
+    post:
+      tags: [Backups]
+      summary: Create backup
+      description: Create a new backup
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBackupRequest'
+      responses:
+        '202':
+          description: Backup creation initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupJob'
+  
+  /api/backups/{id}:
+    get:
+      tags: [Backups]
+      summary: Get backup status
+      description: Get the status of a specific backup
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Backup status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BackupStatus'
+    
+    delete:
+      tags: [Backups]
+      summary: Delete backup
+      description: Delete a backup
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Backup deleted successfully
+  
+  /api/backups/{id}/restore:
+    post:
+      tags: [Backups]
+      summary: Restore backup
+      description: Restore from a backup
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '202':
+          description: Restore initiated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RestoreJob'
+  
+  # Configuration
+  /api/config:
+    get:
+      tags: [Configuration]
+      summary: Get configuration
+      description: Get current system configuration
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: System configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Configuration'
+    
+    put:
+      tags: [Configuration]
+      summary: Update configuration
+      description: Update system configuration
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Configuration'
+      responses:
+        '200':
+          description: Configuration updated successfully
+  
+  /api/config/validate:
+    post:
+      tags: [Configuration]
+      summary: Validate configuration
+      description: Validate a configuration before applying
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Configuration'
+      responses:
+        '200':
+          description: Configuration is valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ValidationResult'
+  
+  # Streams (SSE)
+  /api/ws/metrics:
+    get:
+      tags: [Streams]
+      summary: Metrics stream
+      description: Stream real-time metrics (SSE)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Metrics stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+  
+  /api/ws/logs:
+    get:
+      tags: [Streams]
+      summary: Logs stream
+      description: Stream logs in real-time (SSE)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Logs stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+  
+  /api/ws/events:
+    get:
+      tags: [Streams]
+      summary: Events stream
+      description: Stream system events (SSE)
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Events stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [healthy, degraded, unhealthy]
+        uptime:
+          type: integer
+          description: Uptime in seconds
+        version:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+    
+    Metrics:
+      type: object
+      properties:
+        queries_per_second:
+          type: number
+        active_connections:
+          type: integer
+        memory_usage_mb:
+          type: number
+        cpu_usage_percent:
+          type: number
+    
+    DetailedMetrics:
+      allOf:
+        - $ref: '#/components/schemas/Metrics'
+        - type: object
+          properties:
+            disk_usage_gb:
+              type: number
+            cache_hit_rate:
+              type: number
+            transaction_latency_ms:
+              type: number
+    
+    SystemStats:
+      type: object
+      properties:
+        total_queries:
+          type: integer
+        total_tables:
+          type: integer
+        database_size_mb:
+          type: number
+        last_backup:
+          type: string
+          format: date-time
+    
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    
+    LoginResponse:
+      type: object
+      properties:
+        token:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        expires_at:
+          type: string
+          format: date-time
+    
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    
+    TokenVerification:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        user:
+          $ref: '#/components/schemas/User'
+    
+    CreateUserRequest:
+      type: object
+      required:
+        - username
+        - password
+        - email
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+    
+    ChangePasswordRequest:
+      type: object
+      required:
+        - current_password
+        - new_password
+      properties:
+        current_password:
+          type: string
+        new_password:
+          type: string
+    
+    UpdateProfileRequest:
+      type: object
+      properties:
+        email:
+          type: string
+        display_name:
+          type: string
+
+    FirstRunStatus:
+      type: object
+      properties:
+        first_run:
+          type: boolean
+
+    FirstRunCreateRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+        password:
+          type: string
+
+    TableSchema:
+      type: object
+      properties:
+        success:
+          type: boolean
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/ColumnDefinition'
+
+    UpdateSchemaRequest:
+      type: object
+      required:
+        - columns
+      properties:
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/ColumnDefinition'
+
+    CqlRequest:
+      type: object
+      required:
+        - statement
+      properties:
+        statement:
+          type: string
+        params:
+          type: array
+          items:
+            type: string
+
+    CqlResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        rows:
+          type: array
+          items:
+            type: object
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        error:
+          type: string
+    
+    TableInfo:
+      type: object
+      properties:
+        name:
+          type: string
+        row_count:
+          type: integer
+        size_mb:
+          type: number
+        created_at:
+          type: string
+          format: date-time
+    
+    CreateTableRequest:
+      type: object
+      required:
+        - name
+        - columns
+      properties:
+        name:
+          type: string
+        columns:
+          type: array
+          items:
+            $ref: '#/components/schemas/ColumnDefinition'
+    
+    ColumnDefinition:
+      type: object
+      required:
+        - name
+        - type
+      properties:
+        name:
+          type: string
+        type:
+          type: string
+        nullable:
+          type: boolean
+        default:
+          type: string
+    
+    TableData:
+      type: object
+      properties:
+        rows:
+          type: array
+          items:
+            type: object
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+    
+    QueryRequest:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+        parameters:
+          type: array
+          items:
+            type: string
+    
+    QueryResponse:
+      type: object
+      properties:
+        columns:
+          type: array
+          items:
+            type: string
+        rows:
+          type: array
+          items:
+            type: array
+        execution_time_ms:
+          type: number
+        rows_affected:
+          type: integer
+    
+    QueryHistoryItem:
+      type: object
+      properties:
+        id:
+          type: string
+        query:
+          type: string
+        executed_at:
+          type: string
+          format: date-time
+        execution_time_ms:
+          type: number
+        status:
+          type: string
+    
+    RlsEnableRequest:
+      type: object
+      required:
+        - table
+      properties:
+        table:
+          type: string
+    
+    RlsDisableRequest:
+      type: object
+      required:
+        - table
+      properties:
+        table:
+          type: string
+    
+    RlsStatus:
+      type: object
+      additionalProperties:
+        type: boolean
+    
+    RlsPolicy:
+      type: object
+      properties:
+        id:
+          type: string
+        table:
+          type: string
+        name:
+          type: string
+        operation:
+          type: string
+          enum: [SELECT, INSERT, UPDATE, DELETE]
+        expression:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+    
+    AddPolicyRequest:
+      type: object
+      required:
+        - table
+        - name
+        - operation
+        - expression
+      properties:
+        table:
+          type: string
+        name:
+          type: string
+        operation:
+          type: string
+          enum: [SELECT, INSERT, UPDATE, DELETE]
+        expression:
+          type: string
+    
+    RemovePolicyRequest:
+      type: object
+      required:
+        - table
+        - policy_id
+      properties:
+        table:
+          type: string
+        policy_id:
+          type: string
+    
+    CheckPermissionRequest:
+      type: object
+      required:
+        - table
+        - operation
+        - user_id
+      properties:
+        table:
+          type: string
+        operation:
+          type: string
+        user_id:
+          type: string
+    
+    PermissionCheckResult:
+      type: object
+      properties:
+        allowed:
+          type: boolean
+        reason:
+          type: string
+    
+    LogEntry:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        level:
+          type: string
+        message:
+          type: string
+        source:
+          type: string
+        metadata:
+          type: object
+    
+    LogSearchRequest:
+      type: object
+      properties:
+        query:
+          type: string
+        level:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        limit:
+          type: integer
+    
+    BackupInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        size_mb:
+          type: number
+        type:
+          type: string
+          enum: [full, incremental]
+        status:
+          type: string
+    
+    CreateBackupRequest:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [full, incremental]
+          default: full
+        compression:
+          type: boolean
+          default: true
+    
+    BackupJob:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed]
+    
+    BackupStatus:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        progress_percent:
+          type: number
+        started_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+    
+    RestoreJob:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [pending, in_progress, completed, failed]
+    
+    Configuration:
+      type: object
+      properties:
+        max_connections:
+          type: integer
+        query_timeout_seconds:
+          type: integer
+        log_level:
+          type: string
+          enum: [DEBUG, INFO, WARN, ERROR]
+        backup_schedule:
+          type: string
+    
+    ValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: string
+        warnings:
+          type: array
+          items:
+            type: string

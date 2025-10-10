@@ -424,6 +424,11 @@ func NewServer(store *store.MantisStore, port int) *Server {
 func (s *Server) Start(ctx context.Context) error {
 	mux := http.NewServeMux()
 
+	// Auth API endpoints (for admin UI)
+	mux.HandleFunc("/api/auth/login", s.handleAuthLogin)
+	mux.HandleFunc("/api/auth/verify", s.handleAuthVerify)
+	mux.HandleFunc("/api/auth/logout", s.handleAuthLogout)
+
 	// Key-Value API endpoints
 	mux.HandleFunc("/api/v1/kv/batch", s.handleKVBatch)
 	mux.HandleFunc("/api/v1/kv/", s.handleKV)
@@ -435,6 +440,15 @@ func (s *Server) Start(ctx context.Context) error {
 	// Columnar API endpoints
 	mux.HandleFunc("/api/v1/tables/", s.handleTables)
 	mux.HandleFunc("/api/v1/tables/query", s.handleColumnarQuery)
+	
+	// Admin API endpoints (for frontend)
+	mux.HandleFunc("/api/columnar/tables", s.handleColumnarTables)
+	mux.HandleFunc("/api/columnar/tables/", s.handleColumnarTableOperations)
+	mux.HandleFunc("/api/metrics", s.handleMetrics)
+	mux.HandleFunc("/api/system/stats", s.handleSystemStats)
+	mux.HandleFunc("/api/query", s.handleSQLQuery)
+	mux.HandleFunc("/api/tables", s.handleAdminTables)
+	mux.HandleFunc("/api/ws/metrics", s.handleMetricsWebSocket)
 
 	// Stats endpoint
 	mux.HandleFunc("/api/v1/stats", s.handleStats)
@@ -444,6 +458,7 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// Health check
 	mux.HandleFunc("/health", s.handleHealth)
+	mux.HandleFunc("/api/health", s.handleHealth)
 
 	// Find an available port starting from the configured port
 	actualPort, err := findAvailablePort(s.port, 10)
@@ -1036,4 +1051,317 @@ func splitPath(path string) []string {
 
 func generateID() string {
 	return fmt.Sprintf("doc_%d", time.Now().UnixNano())
+}
+
+// Auth handlers for admin UI
+func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var request struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	// Simple auth for development - accept any email/password
+	// In production, implement proper authentication
+	if request.Email == "" || request.Password == "" {
+		s.writeError(w, http.StatusBadRequest, "Email and password required")
+		return
+	}
+
+	// Generate a simple token (in production, use JWT or similar)
+	token := fmt.Sprintf("token_%d", time.Now().UnixNano())
+
+	response := map[string]interface{}{
+		"token": token,
+		"user": map[string]interface{}{
+			"id":    "user_1",
+			"email": request.Email,
+			"role":  "admin",
+		},
+	}
+
+	s.writeJSON(w, response)
+}
+
+func (s *Server) handleAuthVerify(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Get token from Authorization header
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		s.writeError(w, http.StatusUnauthorized, "Authorization header required")
+		return
+	}
+
+	// Simple token validation (in production, validate JWT properly)
+	if !strings.HasPrefix(authHeader, "Bearer ") {
+		s.writeError(w, http.StatusUnauthorized, "Invalid authorization format")
+		return
+	}
+
+	token := strings.TrimPrefix(authHeader, "Bearer ")
+	if token == "" {
+		s.writeError(w, http.StatusUnauthorized, "Invalid token")
+		return
+	}
+
+	// Return user info (in production, decode from JWT)
+	response := map[string]interface{}{
+		"user": map[string]interface{}{
+			"id":    "user_1",
+			"email": "admin@mantisdb.local",
+			"role":  "admin",
+		},
+	}
+
+	s.writeJSON(w, response)
+}
+
+func (s *Server) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// In production, invalidate the token
+	response := map[string]interface{}{
+		"success": true,
+		"message": "Logged out successfully",
+	}
+
+	s.writeJSON(w, response)
+}
+
+// Admin API handlers for frontend
+func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	ctx := r.Context()
+	_ = s.store.GetStats(ctx)
+
+	// Transform stats to metrics format
+	metrics := map[string]interface{}{
+		"queries_per_second": 0,
+		"cache_hit_ratio":    0.0,
+		"avg_response_time":  0,
+		"timestamp":          time.Now().Unix(),
+	}
+
+	s.writeJSON(w, map[string]interface{}{
+		"metrics":   metrics,
+		"timestamp": time.Now().Format(time.RFC3339),
+	})
+}
+
+func (s *Server) handleSystemStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	ctx := r.Context()
+	stats := s.store.GetStats(ctx)
+
+	// Get system information
+	var memStats runtime.MemStats
+	runtime.ReadMemStats(&memStats)
+
+	systemStats := map[string]interface{}{
+		"version":           s.versionInfo.Version,
+		"platform":          runtime.GOOS + "/" + runtime.GOARCH,
+		"uptime_seconds":    time.Since(time.Now().Add(-time.Hour)).Seconds(), // Mock uptime
+		"active_connections": 0,
+		"cpu_usage_percent": 0.0,
+		"memory_usage_bytes": memStats.Alloc,
+		"database_stats":    stats,
+	}
+
+	s.writeJSON(w, systemStats)
+}
+
+func (s *Server) handleSQLQuery(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		s.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var request struct {
+		Query     string `json:"query"`
+		QueryType string `json:"query_type"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+		s.writeError(w, http.StatusBadRequest, "Invalid JSON")
+		return
+	}
+
+	// For now, return a mock response
+	// In production, integrate with query executor
+	response := map[string]interface{}{
+		"success":     false,
+		"error":       "SQL query execution not yet implemented. Use the Table Editor or API endpoints instead.",
+		"query_id":    fmt.Sprintf("query_%d", time.Now().UnixNano()),
+		"duration_ms": 0,
+	}
+
+	s.writeJSON(w, response)
+}
+
+func (s *Server) handleAdminTables(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Return empty tables list for now
+	// In production, list all tables from columnar store
+	response := map[string]interface{}{
+		"success": true,
+		"tables":  []interface{}{},
+	}
+
+	s.writeJSON(w, response)
+}
+
+func (s *Server) handleColumnarTables(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Return empty tables list
+	response := map[string]interface{}{
+		"tables": []interface{}{},
+	}
+
+	s.writeJSON(w, response)
+}
+
+func (s *Server) handleColumnarTableOperations(w http.ResponseWriter, r *http.Request) {
+	// Extract table name from URL path
+	path := r.URL.Path[len("/api/columnar/tables/"):]
+	parts := splitPath(path)
+
+	if len(parts) == 0 {
+		s.writeError(w, http.StatusBadRequest, "Table name is required")
+		return
+	}
+
+	tableName := parts[0]
+	action := ""
+	if len(parts) > 1 {
+		action = parts[1]
+	}
+
+	ctx := r.Context()
+
+	switch r.Method {
+	case http.MethodGet:
+		// Get table schema
+		table, err := s.store.Columnar().GetTable(ctx, tableName)
+		if err != nil {
+			s.writeError(w, http.StatusNotFound, "Table not found")
+			return
+		}
+		s.writeJSON(w, table)
+
+	case http.MethodPost:
+		if action == "query" {
+			// Query table data
+			var query models.ColumnarQuery
+			if err := json.NewDecoder(r.Body).Decode(&query); err != nil {
+				s.writeError(w, http.StatusBadRequest, "Invalid JSON")
+				return
+			}
+
+			query.Table = tableName
+			result, err := s.store.Columnar().Query(ctx, &query, time.Hour)
+			if err != nil {
+				s.writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+
+			s.writeJSON(w, result)
+		} else if action == "rows" {
+			// Insert rows
+			var request struct {
+				Rows []*models.Row `json:"rows"`
+			}
+
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				s.writeError(w, http.StatusBadRequest, "Invalid JSON")
+				return
+			}
+
+			if err := s.store.Columnar().Insert(ctx, tableName, request.Rows); err != nil {
+				s.writeError(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+
+			response := map[string]interface{}{
+				"table":         tableName,
+				"rows_inserted": len(request.Rows),
+				"success":       true,
+			}
+			s.writeJSON(w, response)
+		} else if action == "delete" {
+			// Delete rows
+			s.writeJSON(w, map[string]interface{}{
+				"success": true,
+				"message": "Delete operation not yet fully implemented",
+			})
+		} else {
+			s.writeError(w, http.StatusBadRequest, "Invalid action")
+		}
+
+	default:
+		s.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
+func (s *Server) handleMetricsWebSocket(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		s.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Set headers for Server-Sent Events
+	w.Header().Set("Content-Type", "text/event-stream")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("Connection", "keep-alive")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+
+	// Send initial metrics
+	metrics := map[string]interface{}{
+		"queries_per_second": 0,
+		"cache_hit_ratio":    0.0,
+		"avg_response_time":  0,
+		"timestamp":          time.Now().Unix(),
+	}
+
+	data, _ := json.Marshal(metrics)
+	fmt.Fprintf(w, "data: %s\n\n", data)
+
+	if flusher, ok := w.(http.Flusher); ok {
+		flusher.Flush()
+	}
+
+	// Keep connection alive for 30 seconds then close
+	// In production, implement proper WebSocket or SSE with continuous updates
+	time.Sleep(30 * time.Second)
 }

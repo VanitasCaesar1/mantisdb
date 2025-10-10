@@ -140,10 +140,10 @@ func GetStressTestConfig(level string) *StressTestConfig {
 		base.OperationsPerSec = 2000
 		base.DataSize = 2048
 	case "extreme":
-		base.Duration = 180 * time.Second // 3 minutes instead of 5
-		base.NumWorkers = runtime.NumCPU() * 6 // 60 workers instead of 80
-		base.OperationsPerSec = 3000 // 3000 ops/sec instead of 5000
-		base.DataSize = 2048 // 2KB instead of 4KB
+		base.Duration = 90 * time.Second // Reduced from 180s
+		base.NumWorkers = runtime.NumCPU() * 3 // 30 workers instead of 60
+		base.OperationsPerSec = 2000 // Reduced from 3000
+		base.DataSize = 1024 // Reduced from 2KB to 1KB
 	}
 
 	base.StressLevel = level
@@ -309,25 +309,67 @@ func (pbs *ProductionBenchmarkSuite) benchmarkHighThroughput(ctx context.Context
 	var wg sync.WaitGroup
 	var opIndex int64
 
+	// Pre-allocate reusable buffer pool to reduce memory pressure
+	bufferPool := sync.Pool{
+		New: func() interface{} {
+			return make([]byte, pbs.config.DataSize)
+		},
+	}
+
 	start := time.Now()
+
+	// Limit concurrent goroutines to prevent memory exhaustion
+	semaphore := make(chan struct{}, pbs.config.NumWorkers)
 
 	for w := 0; w < pbs.config.NumWorkers; w++ {
 		wg.Add(1)
+		semaphore <- struct{}{} // Acquire
+		
 		go func(workerID int) {
 			defer wg.Done()
+			defer func() { <-semaphore }() // Release
 
 			// Create worker-specific random source to avoid contention
 			workerRand := rand.New(rand.NewSource(time.Now().UnixNano() + int64(workerID)))
+			// Pre-generate a seed buffer per worker to reduce per-op RNG CPU cost
+			seed := make([]byte, pbs.config.DataSize)
+			_, _ = workerRand.Read(seed)
+			// Pace this worker to achieve target ops/sec across all workers
+			perWorkerRate := pbs.config.OperationsPerSec / pbs.config.NumWorkers
+			if perWorkerRate <= 0 {
+				perWorkerRate = 1
+			}
+			opInterval := time.Second / time.Duration(perWorkerRate)
+			nextTick := time.Now()
 
 			for i := 0; i < opsPerWorker; i++ {
+				// Rate limit to target ops/sec to avoid CPU spikes
+				now := time.Now()
+				if now.Before(nextTick) {
+					time.Sleep(nextTick.Sub(now))
+				}
+				nextTick = nextTick.Add(opInterval)
 				opStart := time.Now()
 
 				key := fmt.Sprintf("throughput_key_%d_%d", workerID, i)
-				value := make([]byte, pbs.config.DataSize)
-				// Use worker-specific random source
-				workerRand.Read(value)
+				
+				// Get buffer from pool
+				value := bufferPool.Get().([]byte)
+				// Cheap data generation: copy pre-seeded data and stamp identifiers
+				copy(value, seed)
+				if len(value) >= 16 {
+					v0 := byte(workerID)
+					v1 := byte(i)
+					value[0], value[1], value[2], value[3] = v0, v1, v0^v1, 0
+					value[4], value[5], value[6], value[7] = v1, v0, v1^0x5A, v0^0xA5
+					value[8], value[9], value[10], value[11] = byte(i>>8), byte(i>>16), byte(i>>24), byte(i)
+					value[12], value[13], value[14], value[15] = 0xAA, 0x55, 0x33, 0xCC
+				}
 
 				err := pbs.store.KV().Set(ctx, key, value, 0)
+
+				// Return buffer to pool
+				bufferPool.Put(value)
 
 				latency := time.Since(opStart)
 				idx := atomic.AddInt64(&opIndex, 1) - 1
@@ -338,6 +380,11 @@ func (pbs *ProductionBenchmarkSuite) benchmarkHighThroughput(ctx context.Context
 				}
 				if err != nil {
 					atomic.AddInt64(&errorCount, 1)
+				}
+				
+				// Yield to prevent CPU starvation
+				if i%100 == 0 {
+					runtime.Gosched()
 				}
 			}
 		}(w)

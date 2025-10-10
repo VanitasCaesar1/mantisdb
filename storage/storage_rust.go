@@ -3,7 +3,7 @@
 package storage
 
 /*
-#cgo LDFLAGS: -L../rust-core/target/release -lmantisdb_core
+#cgo LDFLAGS: -L../lib -lmantisdb_core -ldl -lm
 #include <stdlib.h>
 #include <stdint.h>
 
@@ -28,7 +28,6 @@ import "C"
 import (
 	"context"
 	"errors"
-	"fmt"
 	"runtime"
 	"unsafe"
 )
@@ -213,7 +212,7 @@ func (s *RustStorageEngine) NewIterator(ctx context.Context, prefix string) (Ite
 func (s *RustStorageEngine) BeginTransaction(ctx context.Context) (Transaction, error) {
 	return &rustTransaction{
 		engine: s,
-		ops:    make(map[string]transactionOp),
+		ops:    make(map[string]rustTransactionOp),
 	}, nil
 }
 
@@ -300,11 +299,11 @@ func (it *rustIterator) Close() error {
 // rustTransaction implements Transaction for Rust storage
 type rustTransaction struct {
 	engine *RustStorageEngine
-	ops    map[string]transactionOp
+	ops    map[string]rustTransactionOp
 }
 
 func (tx *rustTransaction) Put(key, value string) error {
-	tx.ops[key] = transactionOp{opType: "put", value: value}
+	tx.ops[key] = rustTransactionOp{opType: "put", value: value}
 	return nil
 }
 
@@ -319,7 +318,7 @@ func (tx *rustTransaction) Get(key string) (string, error) {
 }
 
 func (tx *rustTransaction) Delete(key string) error {
-	tx.ops[key] = transactionOp{opType: "delete"}
+	tx.ops[key] = rustTransactionOp{opType: "delete"}
 	return nil
 }
 
@@ -337,16 +336,16 @@ func (tx *rustTransaction) Commit() error {
 			}
 		}
 	}
-	tx.ops = make(map[string]transactionOp)
+	tx.ops = make(map[string]rustTransactionOp)
 	return nil
 }
 
 func (tx *rustTransaction) Rollback() error {
-	tx.ops = make(map[string]transactionOp)
+	tx.ops = make(map[string]rustTransactionOp)
 	return nil
 }
 
-type transactionOp struct {
+type rustTransactionOp struct {
 	opType string
 	value  string
 }

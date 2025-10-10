@@ -5,6 +5,7 @@ import { useTables, useTableData } from '../../hooks/useApi';
 
 export function DataBrowserSection() {
   const [selectedTable, setSelectedTable] = useState<string | null>(null);
+  const [selectedTableType, setSelectedTableType] = useState<string>('collection');
   const [currentPage, setCurrentPage] = useState(0);
   const [pageSize] = useState(20);
 
@@ -13,11 +14,18 @@ export function DataBrowserSection() {
     selectedTable || '',
     { 
       limit: pageSize, 
-      offset: currentPage * pageSize 
+      offset: currentPage * pageSize,
+      type: selectedTableType
     }
   );
 
   const tables = tablesData?.tables || [];
+
+  const selectTable = (name: string, type: string) => {
+    setSelectedTable(name);
+    setSelectedTableType(type);
+    setCurrentPage(0);
+  };
 
   if (tablesError) {
     return (
@@ -70,7 +78,7 @@ export function DataBrowserSection() {
                       ? 'border-mantis-500 bg-mantis-50'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
-                  onClick={() => setSelectedTable(table.name)}
+                  onClick={() => selectTable(table.name, table.type)}
                 >
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="font-medium text-gray-900">{table.name}</h4>

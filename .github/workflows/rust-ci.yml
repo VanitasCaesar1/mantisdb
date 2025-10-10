@@ -1,0 +1,147 @@
+name: Rust Core CI
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'rust-core/**'
+      - '.github/workflows/rust-ci.yml'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'rust-core/**'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test Rust Core
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        rust: [stable, nightly]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: ${{ matrix.rust }}
+        override: true
+        components: rustfmt, clippy
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Cache cargo index
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Cache cargo build
+      uses: actions/cache@v3
+      with:
+        path: rust-core/target
+        key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
+    
+    - name: Check formatting
+      working-directory: rust-core
+      run: cargo fmt -- --check
+    
+    - name: Run clippy
+      working-directory: rust-core
+      run: cargo clippy -- -D warnings
+    
+    - name: Build
+      working-directory: rust-core
+      run: cargo build --verbose
+    
+    - name: Run tests
+      working-directory: rust-core
+      run: cargo test --verbose
+    
+    - name: Build release
+      working-directory: rust-core
+      run: cargo build --release --verbose
+
+  benchmark:
+    name: Benchmark Rust Core
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+    
+    - name: Run benchmarks
+      working-directory: rust-core
+      run: cargo bench --no-fail-fast
+    
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v3
+      with:
+        name: benchmark-results
+        path: rust-core/target/criterion/
+
+  integration:
+    name: Integration Test (Go + Rust)
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+    
+    - name: Build Rust core
+      working-directory: rust-core
+      run: cargo build --release
+    
+    - name: Build Go with Rust
+      run: go build -tags rust -v ./cmd/mantisDB
+    
+    - name: Run integration tests
+      run: go test -tags rust -v ./...
+
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        profile: minimal
+        toolchain: stable
+        override: true
+    
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+    
+    - name: Run security audit
+      working-directory: rust-core
+      run: cargo audit

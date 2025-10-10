@@ -1,0 +1,2 @@
+{"component":"wal","duration":"5ms","level":"INFO","lsn":12345,"message":"WAL operation write completed","operation":"write","size":1024,"success":true,"timestamp":"2025-10-02T22:28:13.55964+05:30","txn_id":67890}
+{"component":"transaction","duration":"15ms","level":"INFO","message":"Transaction operation commit completed","operation":"commit","operations":3,"success":true,"timestamp":"2025-10-02T22:28:13.562333+05:30","txn_id":67890}

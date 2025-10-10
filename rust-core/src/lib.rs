@@ -1,18 +1,38 @@
 //! MantisDB High-Performance Core
-//! 
+//!
 //! This module provides lock-free, high-performance storage and caching
 //! primitives designed for 5000+ ops/sec throughput with low latency.
 
 #![allow(clippy::missing_safety_doc)]
 
-pub mod storage;
+// Core MantisDB library - Rust-powered database engine
+pub mod admin_api;
+pub mod batch;
 pub mod cache;
-pub mod ffi;
+pub mod durability;
 pub mod error;
+pub mod fast_writer;
+pub mod ffi;
+pub mod persistent_storage;
+pub mod pool;
+pub mod pool_ffi;
+pub mod rest_api;
+pub mod rls;
+pub mod rls_ffi;
+pub mod sql;
+pub mod storage;
+pub mod storage_engine;
+pub mod transaction;
+pub mod wal;
 
-pub use storage::LockFreeStorage;
+pub use batch::{BatchConfig, BatchWriter};
 pub use cache::LockFreeCache;
-pub use error::{Result, Error};
+pub use error::{Error, Result};
+pub use fast_writer::{FastWriteConfig, FastWriteStats, FastWriter};
+pub use pool::{ConnectionPool, PoolConfig, PooledConnection, PoolStats};
+pub use rest_api::{RestApiServer, RestApiConfig};
+pub use rls::{RlsEngine, Policy, PolicyContext, PolicyCommand, PolicyPermission};
+pub use admin_api::{AdminState, build_admin_router};
 
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;

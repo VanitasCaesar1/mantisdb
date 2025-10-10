@@ -6,7 +6,7 @@ Welcome to MantisDB - a high-performance, production-ready multi-model database 
 
 ```bash
 # Install MantisDB
-curl -sSL https://install.mantisdb.com | bash
+curl -sSL https://install.mantisdb.live | bash
 
 # Start the server
 mantisdb start
@@ -139,7 +139,7 @@ mantisdb query "SELECT * FROM users WHERE age > 25"
 
 ### Quick Install
 ```bash
-curl -sSL https://install.mantisdb.com | bash
+curl -sSL https://install.mantisdb.live | bash
 ```
 
 ### Package Managers

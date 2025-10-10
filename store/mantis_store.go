@@ -628,6 +628,78 @@ func (cs *ColumnarStore) matchesFilter(value interface{}, filter *models.Filter)
 	}
 }
 
+// ListTables returns a list of all tables and collections
+func (ms *MantisStore) ListTables(ctx context.Context) ([]map[string]interface{}, error) {
+	tables := make([]map[string]interface{}, 0)
+	seenNames := make(map[string]bool)
+
+	// List columnar tables
+	tableIter, err := ms.storage.NewIterator(ctx, "table:")
+	if err == nil {
+		defer tableIter.Close()
+		for tableIter.Next() {
+			data := tableIter.Value()
+			var table models.Table
+			if err := json.Unmarshal([]byte(data), &table); err == nil {
+				if !seenNames[table.Name] {
+					seenNames[table.Name] = true
+					tables = append(tables, map[string]interface{}{
+						"name":       table.Name,
+						"type":       "table",
+						"row_count":  table.RowCount,
+						"created_at": table.CreatedAt,
+						"updated_at": table.UpdatedAt,
+						"size_bytes": table.RowCount * 512, // Estimate
+					})
+				}
+			}
+		}
+	}
+
+	// List document collections by scanning doc: keys
+	docIter, err := ms.storage.NewIterator(ctx, "doc:")
+	if err == nil {
+		defer docIter.Close()
+		collectionCounts := make(map[string]int64)
+		for docIter.Next() {
+			key := docIter.Key()
+			// Extract collection name from key: doc:collectionName:documentID
+			parts := []byte(key)
+			if len(parts) > 4 {
+				keyStr := string(parts)
+				if len(keyStr) > 4 {
+					remaining := keyStr[4:] // Skip "doc:"
+					// Find next colon
+					for i, char := range remaining {
+						if char == ':' {
+							collection := remaining[:i]
+							collectionCounts[collection]++
+							break
+						}
+					}
+				}
+			}
+		}
+		
+		// Convert counts to table info
+		for collection, count := range collectionCounts {
+			if !seenNames[collection] {
+				seenNames[collection] = true
+				tables = append(tables, map[string]interface{}{
+					"name":       collection,
+					"type":       "collection",
+					"row_count":  count,
+					"created_at": time.Now().Add(-24 * time.Hour), // Unknown, use placeholder
+					"updated_at": time.Now(),
+					"size_bytes": count * 1024, // Estimate
+				})
+			}
+		}
+	}
+
+	return tables, nil
+}
+
 // GetStats returns statistics about the store
 func (ms *MantisStore) GetStats(ctx context.Context) map[string]interface{} {
 	stats := make(map[string]interface{})

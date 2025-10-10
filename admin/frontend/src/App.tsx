@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Layout } from './components/layout';
-import { Card, CardHeader, CardTitle, CardContent, Button } from './components/ui';
+import { Card, CardHeader, CardTitle, CardContent } from './components/ui/index';
 import { 
   DashboardIcon, 
   DatabaseIcon, 
@@ -11,7 +11,21 @@ import {
   LogsIcon 
 } from './components/icons';
 import { useHealth, useSystemStats, useRealTimeMetrics } from './hooks/useApi';
-import { DataBrowserSection } from './components/sections/DataBrowserSection';
+import { MonitoringSection } from './components/sections/MonitoringSection';
+import { LogsSection } from './components/sections/LogsSection';
+import { BackupsSection } from './components/sections/BackupsSection';
+import { EnhancedSettingsSection } from './components/sections/EnhancedSettingsSection';
+import { AuthenticationSection } from './components/sections/AuthenticationSection';
+import { SchemaVisualizerSection } from './components/sections/SchemaVisualizerSection';
+import { APIDocsSection } from './components/sections/APIDocsSection';
+import { StorageSection } from './components/sections/StorageSection';
+import { DocumentDBSection } from './components/sections/DocumentDBSection';
+import { KeyValueSection } from './components/sections/KeyValueSection';
+import { ColumnarSection } from './components/sections/ColumnarSection';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { LoginPage } from './components/auth/LoginPage';
+import { EnhancedSQLEditor } from './components/sql-editor/EnhancedSQLEditor';
+import { TableEditor } from './components/table-editor/TableEditor';
 import type { SidebarItem } from './components/layout';
 
 const sidebarItems: SidebarItem[] = [
@@ -22,16 +36,64 @@ const sidebarItems: SidebarItem[] = [
     path: '/dashboard'
   },
   {
-    id: 'data',
-    label: 'Data Browser',
+    id: 'data-browser',
+    label: 'Table Editor',
     icon: <DatabaseIcon />,
-    path: '/data'
+    path: '/data-browser'
   },
   {
-    id: 'query',
+    id: 'document-db',
+    label: 'Document Store',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>,
+    path: '/document-db'
+  },
+  {
+    id: 'key-value',
+    label: 'Key-Value Store',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>,
+    path: '/key-value'
+  },
+  {
+    id: 'columnar',
+    label: 'Columnar Store',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>,
+    path: '/columnar'
+  },
+  {
+    id: 'sql-editor',
     label: 'SQL Editor',
     icon: <QueryIcon />,
-    path: '/query'
+    path: '/sql-editor'
+  },
+  {
+    id: 'authentication',
+    label: 'Authentication',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>,
+    path: '/authentication'
+  },
+  {
+    id: 'schema',
+    label: 'Database Schema',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" /></svg>,
+    path: '/schema'
+  },
+  {
+    id: 'storage',
+    label: 'Storage',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z" /></svg>,
+    path: '/storage'
+  },
+  {
+    id: 'api-docs',
+    label: 'API',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>,
+    path: '/api-docs'
+  },
+  {
+    id: 'functions',
+    label: 'Functions',
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+    path: '/functions'
   },
   {
     id: 'monitoring',
@@ -60,7 +122,8 @@ const sidebarItems: SidebarItem[] = [
   }
 ];
 
-function App() {
+function AppContent() {
+  const { isAuthenticated, isLoading, user, logout } = useAuth();
   const [activeSection, setActiveSection] = useState('dashboard');
   
   // API hooks for real data
@@ -230,264 +293,58 @@ function App() {
           </div>
         );
 
-      case 'data':
-        return <DataBrowserSection />;
+      case 'data-browser':
+        return <TableEditor />;
 
-      case 'query':
+      case 'document-db':
+        return <DocumentDBSection />;
+
+      case 'key-value':
+        return <KeyValueSection />;
+
+      case 'columnar':
+        return <ColumnarSection />;
+
+      case 'sql-editor':
+        return <EnhancedSQLEditor />;
+
+      case 'authentication':
+        return <AuthenticationSection />;
+
+      case 'schema':
+        return <SchemaVisualizerSection />;
+
+      case 'storage':
+        return <StorageSection />;
+
+      case 'api-docs':
+        return <APIDocsSection />;
+
+      case 'functions':
         return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>SQL Editor</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12">
-                  <div className="text-gray-400 mb-4">
-                    <QueryIcon className="w-12 h-12 mx-auto" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    SQL Query Interface
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    Execute SQL queries with syntax highlighting, autocomplete, and result visualization.
-                    Save frequently used queries and view execution history.
-                  </p>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-left">
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">SQL Editor</h4>
-                        <p className="text-sm text-gray-600">
-                          Advanced editor with syntax highlighting and keyboard shortcuts
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Query History</h4>
-                        <p className="text-sm text-gray-600">
-                          Track all executed queries with execution times and results
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Saved Queries</h4>
-                        <p className="text-sm text-gray-600">
-                          Save and organize frequently used queries with tags
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Result Visualization</h4>
-                        <p className="text-sm text-gray-600">
-                          View results in table or JSON format with export options
-                        </p>
-                      </div>
-                    </div>
-                    <Button variant="secondary">
-                      Components Ready - Connect to API
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Edge Functions</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-12">
+                <p className="text-gray-600">Functions management coming soon...</p>
+              </div>
+            </CardContent>
+          </Card>
         );
 
       case 'monitoring':
-        return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Monitoring</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12">
-                  <div className="text-gray-400 mb-4">
-                    <MonitorIcon className="w-12 h-12 mx-auto" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Real-time Monitoring Dashboard
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    Monitor system metrics, view logs in real-time, track health checks, and manage alerts.
-                    Get insights into database performance and system health.
-                  </p>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-left">
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Metrics Dashboard</h4>
-                        <p className="text-sm text-gray-600">
-                          Real-time CPU, memory, disk usage and performance metrics
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Log Viewer</h4>
-                        <p className="text-sm text-gray-600">
-                          Stream logs in real-time with filtering and search capabilities
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Health Checks</h4>
-                        <p className="text-sm text-gray-600">
-                          Monitor system components and service health status
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Alerts Panel</h4>
-                        <p className="text-sm text-gray-600">
-                          Manage system alerts with acknowledgment and resolution
-                        </p>
-                      </div>
-                    </div>
-                    <Button variant="secondary">
-                      Components Ready - Connect to API
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
+        return <MonitoringSection />;
 
       case 'logs':
-        return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Logs</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12">
-                  <div className="text-gray-400 mb-4">
-                    <LogsIcon className="w-12 h-12 mx-auto" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Log Management Interface
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    View, search, and filter system logs with real-time streaming capabilities.
-                    Monitor application events and troubleshoot issues effectively.
-                  </p>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Real-time Streaming</h4>
-                        <p className="text-sm text-gray-600">
-                          Watch logs as they happen with auto-scroll and live updates
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Advanced Filtering</h4>
-                        <p className="text-sm text-gray-600">
-                          Filter by log level, component, time range, and search terms
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Structured Display</h4>
-                        <p className="text-sm text-gray-600">
-                          View structured logs with metadata and contextual information
-                        </p>
-                      </div>
-                    </div>
-                    <Button variant="secondary">
-                      Components Ready - Connect to API
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
+        return <LogsSection />;
 
       case 'backups':
-        return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Backup Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12">
-                  <div className="text-gray-400 mb-4">
-                    <BackupIcon className="w-12 h-12 mx-auto" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Backup Management System
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    Create, schedule, and manage database backups with comprehensive restore capabilities.
-                    Ensure data safety with automated backup schedules and monitoring.
-                  </p>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Backup Creation</h4>
-                        <p className="text-sm text-gray-600">
-                          Create manual backups with compression, encryption, and retention options
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Scheduled Backups</h4>
-                        <p className="text-sm text-gray-600">
-                          Set up automated backup schedules with cron-like expressions
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Restore & Monitor</h4>
-                        <p className="text-sm text-gray-600">
-                          Monitor backup status and restore from any backup point
-                        </p>
-                      </div>
-                    </div>
-                    <Button variant="secondary">
-                      Components Ready - Connect to API
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
+        return <BackupsSection />;
 
       case 'settings':
-        return (
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>System Configuration</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12">
-                  <div className="text-gray-400 mb-4">
-                    <SettingsIcon className="w-12 h-12 mx-auto" />
-                  </div>
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">
-                    Configuration Management
-                  </h3>
-                  <p className="text-gray-600 mb-6">
-                    Manage database configuration, feature toggles, and system settings.
-                    Configure server parameters, enable experimental features, and tune performance.
-                  </p>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-left">
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Configuration Editor</h4>
-                        <p className="text-sm text-gray-600">
-                          Edit server, database, backup, logging, and performance settings
-                        </p>
-                      </div>
-                      <div className="p-4 bg-gray-50 rounded-lg">
-                        <h4 className="font-medium text-gray-900 mb-2">Feature Toggles</h4>
-                        <p className="text-sm text-gray-600">
-                          Enable or disable experimental features and system capabilities
-                        </p>
-                      </div>
-                    </div>
-                    <Button variant="secondary">
-                      Components Ready - Connect to API
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        );
+        return <EnhancedSettingsSection />;
       
       default:
         return (
@@ -503,18 +360,30 @@ function App() {
                 <h3 className="text-lg font-medium text-gray-900 mb-2">
                   {sidebarItems.find(item => item.id === activeSection)?.label} Interface
                 </h3>
-                <p className="text-gray-600 mb-6">
-                  This section will be implemented in the next tasks.
+                <p className="text-gray-600">
+                  This section is under development.
                 </p>
-                <Button variant="secondary">
-                  Coming Soon
-                </Button>
               </div>
             </CardContent>
           </Card>
         );
     }
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-mantis-600 mx-auto"></div>
+          <p className="text-gray-600 mt-4">Loading...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
 
   return (
     <Layout
@@ -527,11 +396,21 @@ function App() {
         status: {
           label: healthLoading ? 'Connecting...' : healthData ? 'Online' : 'Offline',
           variant: healthLoading ? 'warning' : healthData ? 'success' : 'danger'
-        }
+        },
+        user: user || undefined,
+        onLogout: logout
       }}
     >
       {renderContent()}
     </Layout>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
 

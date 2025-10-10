@@ -9,13 +9,12 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"path/filepath"
+	"os/exec"
 	"runtime"
 	"strings"
 	"syscall"
 	"time"
 
-	adminapi "mantisDB/admin/api"
 	"mantisDB/api"
 	"mantisDB/benchmark"
 	"mantisDB/cache"
@@ -87,19 +86,19 @@ type LegacyConfig struct {
 
 // MantisDB represents the main database instance
 type MantisDB struct {
-	config          *config.Config
-	legacyConfig    *LegacyConfig
-	storageEngine   storage.StorageEngine
-	cacheManager    *cache.CacheManager
-	queryParser     *query.Parser
-	queryOptimizer  *query.QueryOptimizer
-	queryExecutor   *query.QueryExecutor
-	store           *store.MantisStore
-	apiServer       *api.Server
-	adminServer     *http.Server
-	healthChecker   *health.HealthChecker
-	shutdownManager *shutdown.Manager
-	startupManager  *shutdown.StartupManager
+	config           *config.Config
+	legacyConfig     *LegacyConfig
+	storageEngine    storage.StorageEngine
+	cacheManager     *cache.CacheManager
+	queryParser      *query.Parser
+	queryOptimizer   *query.QueryOptimizer
+	queryExecutor    *query.QueryExecutor
+	store            *store.MantisStore
+	apiServer        *api.Server
+	adminServerProc  *os.Process // Rust admin-server process
+	healthChecker    *health.HealthChecker
+	shutdownManager  *shutdown.Manager
+	startupManager   *shutdown.StartupManager
 }
 
 func main() {
@@ -158,15 +157,11 @@ func main() {
 		log.Fatalf("Failed to start MantisDB: %v", err)
 	}
 
-	// If benchmark-only mode, wait for benchmarks to complete and exit
+	// If benchmark-only mode, benchmarks will trigger shutdown when complete
 	if legacyConfig.BenchmarkOnly {
 		// Wait a bit for benchmarks to start
 		time.Sleep(time.Second * 2)
-		// In benchmark-only mode, we'll exit after benchmarks complete
-		go func() {
-			time.Sleep(time.Second * 10) // Give benchmarks time to run
-			db.shutdownManager.Shutdown()
-		}()
+		// Benchmarks will call shutdown when complete (see runBenchmarks)
 	}
 
 	// Wait for shutdown signal
@@ -237,11 +232,8 @@ func NewMantisDB(cfg *config.Config, legacyConfig *LegacyConfig) (*MantisDB, err
 		SyncWrites: cfg.Database.SyncWrites,
 	}
 
-	if cfg.Database.UseCGO {
-		db.storageEngine = storage.NewCGOStorageEngine(storageConfig)
-	} else {
-		db.storageEngine = storage.NewPureGoStorageEngine(storageConfig)
-	}
+	// Use default storage engine (Rust if built with -tags rust, Pure Go otherwise)
+	db.storageEngine = storage.NewDefaultStorageEngine(storageConfig)
 
 	// Initialize cache manager
 	cacheConfig := cache.CacheConfig{
@@ -320,76 +312,53 @@ func findAvailablePortWithIncrement(startPort int, maxAttempts int, increment in
 	return 0, fmt.Errorf("no available port found after %d attempts starting from %d", maxAttempts, startPort)
 }
 
-// startAdminServer starts the admin dashboard server with embedded assets
+// startAdminServer starts the Rust admin-server binary
+// The Rust server provides both the admin API and serves the static UI
 func (db *MantisDB) startAdminServer(ctx context.Context) error {
-	// Import admin API package
-	adminAPI := db.createAdminAPI()
-
-	// Create HTTP mux
-	mux := http.NewServeMux()
-
-	// Add authentication middleware
-	authMiddleware := db.createAuthMiddleware()
-
-	// Mount admin API with authentication
-	mux.Handle("/api/", authMiddleware(adminAPI))
-
-	// Try to use embedded assets first
-	if adminapi.AssetsAvailable() {
-		log.Printf("Using embedded admin dashboard assets")
-		// Serve embedded static files
-		fileServer := http.FileServer(adminapi.GetAssetsFS())
-		mux.Handle("/", fileServer)
-	} else {
-		// Fallback: try filesystem
-		assetsDir := "admin/api/assets/dist"
-		if _, err := os.Stat(filepath.Join(assetsDir, "index.html")); os.IsNotExist(err) {
-			// Try alternative path
-			assetsDir = "admin/assets/dist"
-			if _, err := os.Stat(filepath.Join(assetsDir, "index.html")); os.IsNotExist(err) {
-				log.Printf("Warning: admin assets not found, admin UI will not be available")
-				// Serve a simple message
-				mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-					w.Header().Set("Content-Type", "text/html")
-					fmt.Fprintf(w, `<html><body><h1>MantisDB Admin</h1><p>Admin UI assets not found. Build with: make build<br>API is available at <a href="/api/">/api/</a></p></body></html>`)
-				})
-			} else {
-				log.Printf("Using filesystem admin dashboard assets from: %s", assetsDir)
-				mux.Handle("/", http.FileServer(http.Dir(assetsDir)))
-			}
-		} else {
-			log.Printf("Using filesystem admin dashboard assets from: %s", assetsDir)
-			mux.Handle("/", http.FileServer(http.Dir(assetsDir)))
-		}
+	// Check if admin-server binary exists
+	adminServerPath := "bin/admin-server"
+	if _, err := os.Stat(adminServerPath); os.IsNotExist(err) {
+		log.Printf("⚠️  Rust admin-server not found at %s", adminServerPath)
+		log.Printf("   Build it with: make build")
+		return nil // Don't fail, just skip admin server
 	}
 
-	// Find an available port starting from the configured port
-	// Use increment of 2 to avoid collision with API server (which uses +1, +2, +3...)
-	adminPort, err := findAvailablePortWithIncrement(db.config.Server.AdminPort, 10, 2)
-	if err != nil {
-		return fmt.Errorf("failed to find available admin port: %v", err)
+	log.Printf("🚀 Starting Rust admin-server...")
+	
+	// Don't use CommandContext - we want the process to outlive the startup context
+	// Use Command instead so it runs independently
+	cmd := exec.Command(adminServerPath)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	
+	// Set process group ID so we can kill the entire process tree
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		Setpgid: true,
 	}
 	
-	// Update config with actual port
-	if adminPort != db.config.Server.AdminPort {
-		log.Printf("Admin port %d in use, using port %d instead", db.config.Server.AdminPort, adminPort)
-		db.config.Server.AdminPort = adminPort
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to start admin server: %v", err)
 	}
 
-	// Create server with timeouts and security headers
-	db.adminServer = &http.Server{
-		Addr:         fmt.Sprintf(":%d", adminPort),
-		Handler:      db.addSecurityHeaders(mux),
-		ReadTimeout:  30 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		IdleTimeout:  120 * time.Second,
-	}
+	// Store the process in the MantisDB struct so we can kill it on shutdown
+	db.adminServerProc = cmd.Process
+	
+	// Monitor the process and properly reap it when it exits
+	// This prevents zombie processes
+	go func() {
+		if err := cmd.Wait(); err != nil {
+			// Only log if it's not a normal termination
+			if exitErr, ok := err.(*exec.ExitError); ok {
+				if exitErr.ExitCode() != 0 && exitErr.ExitCode() != -1 {
+					log.Printf("⚠️  Admin server exited with error: %v", err)
+				}
+			}
+		}
+		// Process has been reaped, clear the reference
+		db.adminServerProc = nil
+	}()
 
-	// Start server
-	if err := db.adminServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		return fmt.Errorf("admin server failed: %v", err)
-	}
-
+	log.Printf("✅ Rust admin-server started (PID: %d) on port 8081", cmd.Process.Pid)
 	return nil
 }
 
@@ -548,10 +517,8 @@ func (db *MantisDB) runBenchmarks(ctx context.Context) {
 	}
 }
 
-// createAdminAPI creates and configures the admin API handler
-func (db *MantisDB) createAdminAPI() http.Handler {
-	return adminapi.NewAdminAPI(db.store)
-}
+// Note: Admin API is now handled by the Rust admin-server binary
+// located at rust-core/src/bin/admin-server.rs
 
 // createAuthMiddleware creates authentication middleware for admin dashboard
 func (db *MantisDB) createAuthMiddleware() func(http.Handler) http.Handler {
@@ -658,26 +625,19 @@ func (db *MantisDB) registerStartupFunctions() {
 		return nil
 	})
 
-	// 3. Start API server (skip in benchmark-only mode)
-	if db.legacyConfig.EnableAPI && !db.legacyConfig.BenchmarkOnly {
-		db.startupManager.RegisterStartupFunc("api", 3, func(ctx context.Context) error {
-			go func() {
-				if err := db.apiServer.Start(ctx); err != nil {
-					log.Printf("API server error: %v", err)
-				}
-			}()
-			return nil
-		})
-	}
+	// 3. API server disabled - Rust admin-server provides all API endpoints
+	// The Rust admin-server on port 8081 handles both UI and API
+	_ = db.apiServer // Keep reference to avoid unused variable warning
 
 	// 4. Start admin dashboard (skip in benchmark-only mode)
+	// Note: Starts the Rust admin-server binary which provides full admin API
 	if db.legacyConfig.EnableAdmin && !db.legacyConfig.BenchmarkOnly {
 		db.startupManager.RegisterStartupFunc("admin", 4, func(ctx context.Context) error {
-			go func() {
-				if err := db.startAdminServer(ctx); err != nil {
-					log.Printf("Admin server error: %v", err)
-				}
-			}()
+			// Start admin server directly (not in goroutine) to catch errors
+			if err := db.startAdminServer(ctx); err != nil {
+				log.Printf("⚠️  Admin server startup error: %v", err)
+				// Don't fail the whole startup, just log the error
+			}
 			return nil
 		})
 	}
@@ -718,10 +678,8 @@ func (db *MantisDB) registerStartupFunctions() {
 		} else {
 			fmt.Printf("✓ MantisDB started successfully\n")
 			if db.legacyConfig.EnableAdmin {
-				fmt.Printf("  Admin: http://localhost:%d\n", db.config.Server.AdminPort)
-			}
-			if db.legacyConfig.EnableAPI {
-				fmt.Printf("  API:   http://localhost:%d/api/v1/\n", db.apiServer.GetPort())
+				fmt.Printf("  Admin UI:  http://localhost:%d\n", db.config.Server.AdminPort)
+				fmt.Printf("  Admin API: http://localhost:%d/api/\n", db.config.Server.AdminPort)
 			}
 		}
 		return nil
@@ -736,10 +694,27 @@ func (db *MantisDB) registerShutdownFunctions() {
 		return nil
 	})
 
-	// 2. Stop admin server
+	// 2. Stop admin server (Rust process)
 	db.shutdownManager.RegisterShutdownFunc("admin", 2, func(ctx context.Context) error {
-		if db.adminServer != nil {
-			return db.adminServer.Shutdown(ctx)
+		if db.adminServerProc != nil {
+			log.Printf("Stopping Rust admin-server (PID: %d)...", db.adminServerProc.Pid)
+			// Kill the entire process group to ensure clean shutdown
+			pgid, err := syscall.Getpgid(db.adminServerProc.Pid)
+			if err == nil {
+				// Send SIGTERM to the process group first for graceful shutdown
+				syscall.Kill(-pgid, syscall.SIGTERM)
+				// Wait a bit for graceful shutdown
+				time.Sleep(500 * time.Millisecond)
+				// If still running, force kill
+				if db.adminServerProc != nil {
+					syscall.Kill(-pgid, syscall.SIGKILL)
+				}
+			} else {
+				// Fallback to killing just the process
+				if err := db.adminServerProc.Kill(); err != nil {
+					return fmt.Errorf("failed to kill admin server: %v", err)
+				}
+			}
 		}
 		return nil
 	})

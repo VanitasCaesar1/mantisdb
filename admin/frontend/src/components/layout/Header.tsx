@@ -10,6 +10,12 @@ export interface HeaderProps {
     label: string;
     variant: 'success' | 'warning' | 'danger' | 'info';
   };
+  user?: {
+    id: string;
+    email: string;
+    role: string;
+  };
+  onLogout?: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -17,7 +23,9 @@ const Header: React.FC<HeaderProps> = ({
   subtitle,
   actions,
   breadcrumbs,
-  status
+  status,
+  user,
+  onLogout
 }) => {
   return (
     <div className="bg-white border-b border-gray-200 px-6 py-4">
@@ -69,11 +77,25 @@ const Header: React.FC<HeaderProps> = ({
         </div>
 
         {/* Actions */}
-        {actions && (
-          <div className="flex items-center space-x-3">
-            {actions}
-          </div>
-        )}
+        <div className="flex items-center space-x-3">
+          {actions}
+          {user && (
+            <div className="flex items-center space-x-3">
+              <div className="text-sm text-right">
+                <div className="font-medium text-gray-900">{user.email}</div>
+                <div className="text-gray-500 text-xs">{user.role}</div>
+              </div>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="px-3 py-2 text-sm font-medium text-gray-700 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Logout
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

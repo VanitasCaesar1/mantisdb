@@ -89,19 +89,32 @@ export function useRealTimeMetrics() {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const eventSource = apiClient.createMetricsWebSocket(
-      (data) => {
-        setMetrics(data);
-        setConnected(true);
-      },
-      (error) => {
-        console.error('Metrics WebSocket error:', error);
+    let es: EventSource | null = null;
+
+    const connect = async () => {
+      try {
+        es = await apiClient.createMetricsWebSocket(
+          (data) => {
+            setMetrics(data);
+            setConnected(true);
+          },
+          (error) => {
+            console.error('Metrics WebSocket error:', error);
+            setConnected(false);
+          }
+        );
+      } catch (error) {
+        console.error('Failed to create Metrics WebSocket:', error);
         setConnected(false);
       }
-    );
+    };
+
+    connect();
 
     return () => {
-      eventSource.close();
+      if (es) {
+        es.close();
+      }
       setConnected(false);
     };
   }, []);
@@ -115,19 +128,32 @@ export function useRealTimeLogs() {
   const [connected, setConnected] = useState(false);
 
   useEffect(() => {
-    const eventSource = apiClient.createLogsWebSocket(
-      (data) => {
-        setLogs(prev => [...prev, data].slice(-100)); // Keep last 100 logs
-        setConnected(true);
-      },
-      (error) => {
-        console.error('Logs WebSocket error:', error);
+    let es: EventSource | null = null;
+
+    const connect = async () => {
+      try {
+        es = await apiClient.createLogsWebSocket(
+          (data) => {
+            setLogs(prev => [...prev, data].slice(-100)); // Keep last 100 logs
+            setConnected(true);
+          },
+          (error) => {
+            console.error('Logs WebSocket error:', error);
+            setConnected(false);
+          }
+        );
+      } catch (error) {
+        console.error('Failed to create Logs WebSocket:', error);
         setConnected(false);
       }
-    );
+    };
+
+    connect();
 
     return () => {
-      eventSource.close();
+      if (es) {
+        es.close();
+      }
       setConnected(false);
     };
   }, []);
