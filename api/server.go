@@ -445,6 +445,7 @@ func (s *Server) Start(ctx context.Context) error {
 	mux.HandleFunc("/api/columnar/tables", s.handleColumnarTables)
 	mux.HandleFunc("/api/columnar/tables/", s.handleColumnarTableOperations)
 	mux.HandleFunc("/api/metrics", s.handleMetrics)
+	mux.HandleFunc("/api/stats", s.handleSystemStats) // Alias for system stats
 	mux.HandleFunc("/api/system/stats", s.handleSystemStats)
 	mux.HandleFunc("/api/query", s.handleSQLQuery)
 	mux.HandleFunc("/api/tables", s.handleAdminTables)
@@ -1168,6 +1169,9 @@ func (s *Server) handleMetrics(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Store server start time
+var serverStartTime = time.Now()
+
 func (s *Server) handleSystemStats(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		s.writeError(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -1181,14 +1185,17 @@ func (s *Server) handleSystemStats(w http.ResponseWriter, r *http.Request) {
 	var memStats runtime.MemStats
 	runtime.ReadMemStats(&memStats)
 
+	// Calculate actual uptime
+	uptime := time.Since(serverStartTime).Seconds()
+
 	systemStats := map[string]interface{}{
-		"version":           s.versionInfo.Version,
-		"platform":          runtime.GOOS + "/" + runtime.GOARCH,
-		"uptime_seconds":    time.Since(time.Now().Add(-time.Hour)).Seconds(), // Mock uptime
-		"active_connections": 0,
-		"cpu_usage_percent": 0.0,
+		"version":            s.versionInfo.Version,
+		"platform":           runtime.GOOS + "/" + runtime.GOARCH,
+		"uptime_seconds":     uptime,
+		"active_connections": runtime.NumGoroutine(), // Use goroutines as proxy for connections
+		"cpu_usage_percent":  float64(runtime.NumGoroutine()) / 1000.0 * 100.0, // Rough estimate
 		"memory_usage_bytes": memStats.Alloc,
-		"database_stats":    stats,
+		"database_stats":     stats,
 	}
 
 	s.writeJSON(w, systemStats)

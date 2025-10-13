@@ -1,94 +1,55 @@
 /**
  * API Configuration
  * 
- * Dynamically detects the correct API endpoint based on environment
- * and running services. Avoids hardcoded ports.
+ * Simplified configuration for reliable API connectivity.
+ * In development, uses Vite proxy. In production, uses same origin.
  */
 
 export interface ApiConfig {
   baseUrl: string;
-  adminPort: number;
-  apiPort: number;
-}
-
-/**
- * Detect which port the Rust admin-server is running on
- * by trying common ports in order
- */
-async function detectAdminPort(): Promise<number> {
-  const portsToTry = [8081, 8082, 8083, 8084, 8085, 3001, 3002];
-  
-  for (const port of portsToTry) {
-    try {
-      const response = await fetch(`http://localhost:${port}/api/health`, {
-        method: 'GET',
-        signal: AbortSignal.timeout(1000), // 1 second timeout
-      });
-      
-      if (response.ok) {
-        console.log(`✅ Detected Rust admin-server on port ${port}`);
-        return port;
-      }
-    } catch (error) {
-      // Port not available or server not responding, try next
-      continue;
-    }
-  }
-  
-  // Fallback to default
-  console.warn('⚠️  Could not detect admin server port, using default 8081');
-  return 8081;
 }
 
 /**
  * Get API configuration based on environment
  */
-export async function getApiConfig(): Promise<ApiConfig> {
+export function getApiConfig(): ApiConfig {
   const hostname = window.location.hostname;
   const protocol = window.location.protocol;
+  
+  // In development with Vite proxy, use relative URLs
+  if (import.meta.env.DEV) {
+    return {
+      baseUrl: '', // Empty string means same origin, Vite will proxy to backend
+    };
+  }
   
   // In production, the admin UI is served by the same server
   if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
     // Production: Use same host and port as the UI
     const port = parseInt(window.location.port) || (protocol === 'https:' ? 443 : 80);
+    const portStr = port === 80 || port === 443 ? '' : `:${port}`;
     return {
-      baseUrl: `${protocol}//${hostname}:${port}`,
-      adminPort: port,
-      apiPort: port,
+      baseUrl: `${protocol}//${hostname}${portStr}`,
     };
   }
   
-  // Development: Detect the admin server port
-  const adminPort = await detectAdminPort();
-  
+  // Local production build: Use localhost:8080
   return {
-    baseUrl: `http://localhost:${adminPort}`,
-    adminPort: adminPort,
-    apiPort: 8080, // Go API server (if needed)
+    baseUrl: 'http://localhost:8080',
   };
 }
 
 /**
  * Get the base URL for API calls
- * Uses cached config if available, otherwise detects
  */
 let cachedConfig: ApiConfig | null = null;
 
-export async function getBaseUrl(): Promise<string> {
+export function getBaseUrl(): string {
   if (!cachedConfig) {
-    cachedConfig = await getApiConfig();
+    cachedConfig = getApiConfig();
+    console.log(`🔗 API Client configured with base URL: ${cachedConfig.baseUrl || '(same origin)'}`);
   }
   return cachedConfig.baseUrl;
-}
-
-/**
- * Get the admin port
- */
-export async function getAdminPort(): Promise<number> {
-  if (!cachedConfig) {
-    cachedConfig = await getApiConfig();
-  }
-  return cachedConfig.adminPort;
 }
 
 /**
@@ -101,8 +62,8 @@ export function resetApiConfig(): void {
 /**
  * Build a full API URL
  */
-export async function buildApiUrl(endpoint: string): Promise<string> {
-  const baseUrl = await getBaseUrl();
+export function buildApiUrl(endpoint: string): string {
+  const baseUrl = getBaseUrl();
   const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   return `${baseUrl}${path}`;
 }

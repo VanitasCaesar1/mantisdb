@@ -343,142 +343,19 @@ export class AdminApiClient {
 // Import dynamic API configuration
 import { getBaseUrl } from '../config/api';
 
-// Create default client instance with dynamic base URL detection
-// The base URL is determined at runtime by detecting the admin server
+// Create singleton client instance
 let apiClientInstance: AdminApiClient | null = null;
-let initPromise: Promise<AdminApiClient> | null = null;
 
-export async function getApiClient(): Promise<AdminApiClient> {
+function getLazyClient(): AdminApiClient {
   if (!apiClientInstance) {
-    if (!initPromise) {
-      initPromise = (async () => {
-        const baseUrl = await getBaseUrl();
-        apiClientInstance = new AdminApiClient(baseUrl);
-        console.log(`🔗 API Client initialized with base URL: ${baseUrl}`);
-        return apiClientInstance;
-      })();
-    }
-    return initPromise;
+    const baseUrl = getBaseUrl();
+    apiClientInstance = new AdminApiClient(baseUrl);
   }
   return apiClientInstance;
 }
 
-// Lazy-initialized API client that auto-detects the base URL
-let lazyClient: AdminApiClient | null = null;
-
-async function getLazyClient(): Promise<AdminApiClient> {
-  if (!lazyClient) {
-    const baseUrl = await getBaseUrl();
-    lazyClient = new AdminApiClient(baseUrl);
-    console.log(`🔗 API Client initialized with base URL: ${baseUrl}`);
-  }
-  return lazyClient;
-}
-
-// Proxy client that forwards all calls to the lazy-initialized client
-export const apiClient = {
-  async getHealth() {
-    return (await getLazyClient()).getHealth();
-  },
-  async getMetrics() {
-    return (await getLazyClient()).getMetrics();
-  },
-  async getSystemStats() {
-    return (await getLazyClient()).getSystemStats();
-  },
-  async getConfig() {
-    return (await getLazyClient()).getConfig();
-  },
-  async updateConfig(config: Record<string, any>) {
-    return (await getLazyClient()).updateConfig(config);
-  },
-  async getTables() {
-    return (await getLazyClient()).getTables();
-  },
-  async createTable(name: string, type: string, columns: any[]) {
-    return (await getLazyClient()).createTable(name, type, columns);
-  },
-  async getColumnarTables() {
-    return (await getLazyClient()).getColumnarTables();
-  },
-  async createColumnarTable(name: string, columns: any[], partition_key?: string[]) {
-    return (await getLazyClient()).createColumnarTable(name, columns, partition_key);
-  },
-  async getTableData(table: string, options: any = {}) {
-    return (await getLazyClient()).getTableData(table, options);
-  },
-  async getTableSchema(table: string) {
-    return (await getLazyClient()).getTableSchema(table);
-  },
-  async updateTableSchema(table: string, columns: any[]) {
-    return (await getLazyClient()).updateTableSchema(table, columns);
-  },
-  async queryColumnarTable(table: string, body: Record<string, any>) {
-    return (await getLazyClient()).queryColumnarTable(table, body);
-  },
-  async insertColumnarRows(table: string, rows: Record<string, any>[]) {
-    return (await getLazyClient()).insertColumnarRows(table, rows);
-  },
-  async deleteColumnarRows(table: string, filters: Record<string, any>) {
-    return (await getLazyClient()).deleteColumnarRows(table, filters);
-  },
-  async executeCql(statement: string, params?: any[]) {
-    return (await getLazyClient()).executeCql(statement, params);
-  },
-  async createTableData(table: string, data: Record<string, any>, type?: string) {
-    return (await getLazyClient()).createTableData(table, data, type);
-  },
-  async updateTableData(table: string, id: string, data: Record<string, any>, type?: string) {
-    return (await getLazyClient()).updateTableData(table, id, data, type);
-  },
-  async deleteTableData(table: string, id: string, type?: string) {
-    return (await getLazyClient()).deleteTableData(table, id, type);
-  },
-  async executeQuery(queryRequest: any) {
-    return (await getLazyClient()).executeQuery(queryRequest);
-  },
-  async getQueryHistory(limit?: number) {
-    return (await getLazyClient()).getQueryHistory(limit);
-  },
-  async getBackups() {
-    return (await getLazyClient()).getBackups();
-  },
-  async createBackup(request: any) {
-    return (await getLazyClient()).createBackup(request);
-  },
-  async getBackupStatus(backupId: string) {
-    return (await getLazyClient()).getBackupStatus(backupId);
-  },
-  async deleteBackup(backupId: string) {
-    return (await getLazyClient()).deleteBackup(backupId);
-  },
-  async restoreBackup(backupId: string, options: any = {}) {
-    return (await getLazyClient()).restoreBackup(backupId, options);
-  },
-  async getLogs(filter?: any) {
-    return (await getLazyClient()).getLogs(filter);
-  },
-  async searchLogs(filter: any) {
-    return (await getLazyClient()).searchLogs(filter);
-  },
-  async listStorage(path?: string) {
-    return (await getLazyClient()).listStorage(path);
-  },
-  getStorageDownloadUrl(path: string) {
-    return getLazyClient().then(client => client.getStorageDownloadUrl(path));
-  },
-  createMetricsWebSocket(onMessage: (data: any) => void, onError?: (error: Event) => void) {
-    // For WebSocket, we need to get the client synchronously
-    // Use a fallback URL that will be replaced
-    return getLazyClient().then(client => client.createMetricsWebSocket(onMessage, onError));
-  },
-  createLogsWebSocket(onMessage: (data: any) => void, onError?: (error: Event) => void) {
-    return getLazyClient().then(client => client.createLogsWebSocket(onMessage, onError));
-  },
-  createEventsWebSocket(onMessage: (data: any) => void, onError?: (error: Event) => void) {
-    return getLazyClient().then(client => client.createEventsWebSocket(onMessage, onError));
-  },
-};
+// Export singleton API client
+export const apiClient = getLazyClient();
 
 // Hook for React components
 export function useApiClient() {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient, type ApiResponse } from '../api/client';
 
 export interface UseApiState<T> {
@@ -10,18 +10,31 @@ export interface UseApiState<T> {
 
 export function useApi<T>(
   apiCall: () => Promise<ApiResponse<T>>,
-  dependencies: any[] = []
+  options: { 
+    dependencies?: any[];
+    enabled?: boolean;
+  } = {}
 ): UseApiState<T> {
+  const { dependencies = [], enabled = true } = options;
   const [data, setData] = useState<T | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const mountedRef = useRef(true);
 
   const fetchData = useCallback(async () => {
+    if (!enabled) {
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
       
       const response = await apiCall();
+      
+      // Only update state if component is still mounted
+      if (!mountedRef.current) return;
       
       if (response.success && response.data) {
         setData(response.data);
@@ -29,14 +42,22 @@ export function useApi<T>(
         setError(response.error || 'Unknown error occurred');
       }
     } catch (err) {
+      if (!mountedRef.current) return;
       setError(err instanceof Error ? err.message : 'Network error');
     } finally {
-      setLoading(false);
+      if (mountedRef.current) {
+        setLoading(false);
+      }
     }
-  }, dependencies);
+  }, [enabled, ...dependencies]);
 
   useEffect(() => {
+    mountedRef.current = true;
     fetchData();
+    
+    return () => {
+      mountedRef.current = false;
+    };
   }, [fetchData]);
 
   return {
@@ -67,20 +88,20 @@ export function useTables() {
 export function useTableData(table: string, options: { limit?: number; offset?: number; type?: string } = {}) {
   return useApi<{ data: any[]; total_count: number; limit: number; offset: number; table: string; type: string }>(
     () => apiClient.getTableData(table, options),
-    [table, options.limit, options.offset, options.type]
+    { dependencies: [table, options.limit, options.offset, options.type] }
   );
 }
 
 export function useQueryHistory(limit?: number) {
-  return useApi(() => apiClient.getQueryHistory(limit), [limit]);
+  return useApi(() => apiClient.getQueryHistory(limit), { dependencies: [limit] });
 }
 
 export function useBackups() {
-  return useApi(() => apiClient.getBackups());
+  return useApi(() => apiClient.getBackups(), {});
 }
 
 export function useLogs(filter?: any) {
-  return useApi(() => apiClient.getLogs(filter), [filter]);
+  return useApi(() => apiClient.getLogs(filter), { dependencies: [filter] });
 }
 
 // Hook for real-time metrics

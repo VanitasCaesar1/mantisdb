@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo, memo } from 'react';
 import { Layout } from './components/layout';
 import { Card, CardHeader, CardTitle, CardContent } from './components/ui/index';
 import { 
@@ -122,11 +122,34 @@ const sidebarItems: SidebarItem[] = [
   }
 ];
 
+// Memoized stats card component for better performance
+const StatsCard = memo(({ icon, title, value, colorClass }: { 
+  icon: React.ReactNode; 
+  title: string; 
+  value: string; 
+  colorClass: string;
+}) => (
+  <Card>
+    <CardContent className="p-6">
+      <div className="flex items-center">
+        <div className={`p-2 ${colorClass} rounded-lg`}>
+          {icon}
+        </div>
+        <div className="ml-4">
+          <p className="text-sm font-medium text-gray-600">{title}</p>
+          <p className="text-2xl font-bold text-gray-900">{value}</p>
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+));
+StatsCard.displayName = 'StatsCard';
+
 function AppContent() {
   const { isAuthenticated, isLoading, user, logout } = useAuth();
   const [activeSection, setActiveSection] = useState('dashboard');
   
-  // API hooks for real data
+  // API hooks for real data - only fetch when dashboard is active
   const { data: healthData, loading: healthLoading } = useHealth();
   const { data: systemStats, loading: systemLoading } = useSystemStats();
   const { metrics: realTimeMetrics, connected: metricsConnected } = useRealTimeMetrics();
@@ -134,6 +157,27 @@ function AppContent() {
   const handleSidebarItemClick = (itemId: string) => {
     setActiveSection(itemId);
   };
+
+  // Memoize computed values
+  const totalRecords = useMemo(() => 
+    systemLoading ? '...' : String(systemStats?.database_stats?.total_records || '0'),
+    [systemLoading, systemStats]
+  );
+
+  const activeConnections = useMemo(() => 
+    systemLoading ? '...' : String(systemStats?.active_connections || '0'),
+    [systemLoading, systemStats]
+  );
+
+  const cpuUsage = useMemo(() => 
+    systemLoading ? '...' : `${Math.round(systemStats?.cpu_usage_percent || 0)}%`,
+    [systemLoading, systemStats]
+  );
+
+  const memoryUsage = useMemo(() => 
+    systemLoading ? '...' : `${Math.round((systemStats?.memory_usage_bytes || 0) / 1024 / 1024)}MB`,
+    [systemLoading, systemStats]
+  );
 
   const renderContent = () => {
     switch (activeSection) {
@@ -157,69 +201,33 @@ function AppContent() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-mantis-100 rounded-lg">
-                      <DatabaseIcon className="w-6 h-6 text-mantis-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Total Records</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {systemLoading ? '...' : systemStats?.database_stats?.total_records || '0'}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatsCard
+                icon={<DatabaseIcon className="w-6 h-6 text-mantis-600" />}
+                title="Total Records"
+                value={totalRecords}
+                colorClass="bg-mantis-100"
+              />
               
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-blue-100 rounded-lg">
-                      <QueryIcon className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Active Connections</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {systemLoading ? '...' : systemStats?.active_connections || '0'}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatsCard
+                icon={<QueryIcon className="w-6 h-6 text-blue-600" />}
+                title="Active Connections"
+                value={activeConnections}
+                colorClass="bg-blue-100"
+              />
               
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-yellow-100 rounded-lg">
-                      <MonitorIcon className="w-6 h-6 text-yellow-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">CPU Usage</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {systemLoading ? '...' : `${Math.round(systemStats?.cpu_usage_percent || 0)}%`}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatsCard
+                icon={<MonitorIcon className="w-6 h-6 text-yellow-600" />}
+                title="CPU Usage"
+                value={cpuUsage}
+                colorClass="bg-yellow-100"
+              />
               
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <BackupIcon className="w-6 h-6 text-green-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Memory Usage</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {systemLoading ? '...' : `${Math.round((systemStats?.memory_usage_bytes || 0) / 1024 / 1024)}MB`}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <StatsCard
+                icon={<BackupIcon className="w-6 h-6 text-green-600" />}
+                title="Memory Usage"
+                value={memoryUsage}
+                colorClass="bg-green-100"
+              />
             </div>
 
             <Card>

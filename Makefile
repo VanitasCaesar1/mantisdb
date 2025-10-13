@@ -24,10 +24,10 @@ help:
 	@echo "╚══════════════════════════════════════════════════════════════╝"
 	@echo ""
 	@echo "QUICK START:"
-	@echo "  make build          Build MantisDB (includes Rust pool & API)"
-	@echo "  ./build.sh          Same as make build"
-	@echo "  make run            Build and run with admin dashboard"
-	@echo "  make run-api        Run standalone REST API server"
+	@echo "  make run-backend    Start backend API (recommended)"
+	@echo "  make run-dashboard  Start admin dashboard in another terminal"
+	@echo "  make dev            Run backend in development mode"
+	@echo "  make build          Full build (includes Rust pool & API)"
 	@echo ""
 	@echo "CONNECTION POOLING & REST API:"
 	@echo "  make run-api        Start REST API server (http://0.0.0.0:8080)"
@@ -50,6 +50,25 @@ help:
 # Build MantisDB with Rust integration
 build:
 	@./build-unified.sh
+
+# Build backend only (skip UI build)
+build-backend-only:
+	@echo "🔨 Building MantisDB backend (Go)..."
+	@SKIP_UI=true ./build-unified.sh || go build -ldflags="$(LDFLAGS)" -o $(BINARY_NAME) cmd/mantisDB/main.go
+	@echo "✅ Backend built successfully"
+
+# Run backend only
+run-backend:
+	@echo "🚀 Starting MantisDB Backend API Server..."
+	@echo "  API: http://localhost:8080"
+	@echo "  Health: http://localhost:8080/health"
+	@go run cmd/mantisDB/main.go
+
+# Run dashboard dev server
+run-dashboard:
+	@echo "🎨 Starting Admin Dashboard Dev Server..."
+	@echo "  Dashboard: http://localhost:5173"
+	@cd $(FRONTEND_DIR) && npm install && npm run dev
 
 # Build Rust core library (connection pool + REST API)
 build-rust:
@@ -117,12 +136,17 @@ install: build
 	@echo "✅ MantisDB installed to ~/.local/bin/$(BINARY_NAME)"
 	@echo "Make sure ~/.local/bin is in your PATH"
 
-# Build and run with admin dashboard
-run: build
-	@echo "Starting MantisDB with admin dashboard..."
-	@echo "Database: http://localhost:8080"
-	@echo "Admin dashboard: http://localhost:$(ADMIN_PORT)"
-	./$(BINARY_NAME) --admin-port=$(ADMIN_PORT)
+# Build and run with admin dashboard (skip UI build to avoid timeouts)
+run: build-backend-only
+	@echo "Starting MantisDB server..."
+	@echo "Database API: http://localhost:8080"
+	@echo "Admin dashboard: Run 'make run-dashboard' in a separate terminal"
+	@echo ""
+	@echo "📝 Quick Start:"
+	@echo "  Terminal 1: make run-backend"
+	@echo "  Terminal 2: make run-dashboard"
+	@echo ""
+	./$(BINARY_NAME)
 
 # Development mode
 dev:

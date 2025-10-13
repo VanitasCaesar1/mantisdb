@@ -310,7 +310,8 @@ export const StorageSection = () => {
                       <div className="flex items-center justify-end gap-2">
                         {item.type === 'file' && (
                           <button className="text-blue-600 hover:text-blue-900" onClick={() => {
-                            apiClient.getStorageDownloadUrl(item.path).then(url => window.open(url, '_blank'));
+                            const url = apiClient.getStorageDownloadUrl(item.path);
+                            window.open(url, '_blank');
                           }}>
                             <Download className="w-4 h-4" />
                           </button>

@@ -27,20 +27,18 @@ export function LogsSection() {
     let interval: number | undefined;
     if (live) {
       // Open SSE stream
-      apiClient.createLogsWebSocket((data: any) => {
+      const es = apiClient.createLogsWebSocket((data: any) => {
         // Data could be either {type: 'log_entry', data: {...}} or the entry itself
         const entry = data?.type === 'log_entry' ? data.data : data;
-        if (!entry) return;
-        const normalized: LogEntry = {
+        const normalized = {
           timestamp: typeof entry.timestamp === 'string' ? entry.timestamp : new Date(entry.timestamp).toISOString(),
           level: (entry.level || 'info').toLowerCase(),
           message: entry.message || '',
           component: entry.component || undefined,
         };
         setLogs(prev => [normalized, ...prev].slice(0, 1000));
-      }).then((es) => {
-        esRef.current = es;
       });
+      esRef.current = es;
     } else {
       // Poll every 5s when live is off
       interval = window.setInterval(fetchLogs, 5000);

@@ -167,11 +167,11 @@ make build
 
 ## 🔗 Links
 
-- **[GitHub](https://github.com/mantisdb/mantisdb)** - Source code
+- **[GitHub](https://github.com/VanitasCaesar1/mantisdb)** - Source code
 - **[Releases](https://github.com/mantisdb/mantisdb/releases)** - Download releases
 - **[Issues](https://github.com/mantisdb/mantisdb/issues)** - Bug reports
 - **[Discussions](https://github.com/mantisdb/mantisdb/discussions)** - Community
-- **[Enterprise](mailto:enterprise@mantisdb.com)** - Commercial support
+- **[Enterprise](vanitascaesar@gmail.com)** - Commercial support
 
 ## 📄 License
 

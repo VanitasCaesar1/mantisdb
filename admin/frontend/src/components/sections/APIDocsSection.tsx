@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Code, Copy, Check, Book, Database, FileJson, Table } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui';
-import { getAdminPort } from '../../config/api';
+import { getBaseUrl } from '../../config/api';
 
 interface Endpoint {
   method: string;
@@ -19,11 +19,10 @@ export const APIDocsSection = () => {
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [baseUrl, setBaseUrl] = useState<string>('');
 
-  // Dynamically detect the admin server port
+  // Get the API base URL
   useEffect(() => {
-    getAdminPort().then(port => {
-      setBaseUrl(`${window.location.protocol}//${window.location.hostname}:${port}/api`);
-    });
+    const apiBaseUrl = getBaseUrl();
+    setBaseUrl(`${apiBaseUrl}/api`);
   }, []);
 
   const endpoints: Endpoint[] = [
