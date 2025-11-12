@@ -81,7 +81,11 @@ impl Parser {
             None
         };
         
-        let joins = Vec::new(); // TODO: Implement JOIN parsing
+        // Parse JOINs
+        let mut joins = Vec::new();
+        while self.is_join_keyword() {
+            joins.push(self.parse_join()?);
+        }
         
         let where_clause = if self.current_token() == &Token::Where {
             self.advance();
@@ -363,6 +367,22 @@ impl Parser {
             }
             Token::LeftParen => {
                 self.advance();
+                
+                // Check if this is a subquery (starts with SELECT)
+                if self.current_token() == &Token::Select {
+                    let subquery = self.parse_select()?;
+                    self.expect(Token::RightParen)?;
+                    
+                    if let Statement::Select(select_stmt) = subquery {
+                        return Ok(Expression::Subquery(Box::new(select_stmt)));
+                    } else {
+                        return Err(MantisError::ParseError(
+                            "Expected SELECT statement in subquery".to_string()
+                        ));
+                    }
+                }
+                
+                // Otherwise, it's a parenthesized expression
                 let expr = self.parse_expression()?;
                 self.expect(Token::RightParen)?;
                 Ok(expr)
@@ -388,6 +408,64 @@ impl Parser {
         }
         
         Ok(exprs)
+    }
+    
+    fn is_join_keyword(&self) -> bool {
+        matches!(
+            self.current_token(),
+            Token::Join | Token::Inner | Token::Left | Token::Right | Token::Outer
+        )
+    }
+    
+    fn parse_join(&mut self) -> Result<Join, MantisError> {
+        // Determine join type
+        let join_type = match self.current_token() {
+            Token::Inner => {
+                self.advance();
+                self.expect(Token::Join)?;
+                JoinType::Inner
+            }
+            Token::Left => {
+                self.advance();
+                // Optional OUTER
+                if self.current_token() == &Token::Outer {
+                    self.advance();
+                }
+                self.expect(Token::Join)?;
+                JoinType::Left
+            }
+            Token::Right => {
+                self.advance();
+                // Optional OUTER
+                if self.current_token() == &Token::Outer {
+                    self.advance();
+                }
+                self.expect(Token::Join)?;
+                JoinType::Right
+            }
+            Token::Join => {
+                self.advance();
+                JoinType::Inner // Default to INNER JOIN
+            }
+            _ => {
+                return Err(MantisError::ParseError(
+                    "Expected JOIN keyword".to_string()
+                ));
+            }
+        };
+        
+        // Parse table reference
+        let table = self.parse_table_reference()?;
+        
+        // Parse ON condition
+        self.expect(Token::On)?;
+        let condition = self.parse_expression()?;
+        
+        Ok(Join {
+            join_type,
+            table,
+            condition,
+        })
     }
     
     fn parse_order_by_items(&mut self) -> Result<Vec<OrderByItem>, MantisError> {

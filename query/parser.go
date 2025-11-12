@@ -1,3 +1,4 @@
+// parser.go - SQL parser with custom tokenizer
 package query
 
 import (
@@ -6,7 +7,7 @@ import (
 	"strings"
 )
 
-// QueryType represents the type of query
+// QueryType represents the type of query.
 type QueryType int
 
 const (
@@ -44,10 +45,14 @@ type OrderByClause struct {
 	Desc  bool
 }
 
-// Parser handles query parsing
+// Parser handles query parsing.
+// We implement our own parser (not a library) because:
+// 1. We only support a subset of SQL, so full SQL parsers are overkill
+// 2. Custom parser gives us control over error messages
+// 3. Zero dependencies = faster builds and smaller binaries
 type Parser struct {
 	tokens []Token
-	pos    int
+	pos    int // Current position in token stream
 }
 
 // Token represents a lexical token
@@ -114,11 +119,15 @@ func (p *Parser) Parse(queryStr string) (*Query, error) {
 	}
 }
 
-// tokenize breaks the query string into tokens
+// tokenize breaks the query string into tokens.
+// Single-pass tokenization - we don't build an AST, just token stream.
+// This is faster and simpler than multi-pass parsing for our SQL subset.
 func (p *Parser) tokenize(queryStr string) ([]Token, error) {
 	var tokens []Token
 	queryStr = strings.TrimSpace(queryStr)
 
+	// Manual character-by-character scan. A regex-based tokenizer would be
+	// slower and harder to debug for SQL's complex quoting rules.
 	i := 0
 	for i < len(queryStr) {
 		// Skip whitespace
@@ -127,7 +136,9 @@ func (p *Parser) tokenize(queryStr string) ([]Token, error) {
 			continue
 		}
 
-		// String literals
+		// String literals with quote matching.
+		// We support both single and double quotes for SQL compatibility.
+		// No escape sequence handling yet - strings are literal.
 		if queryStr[i] == '\'' || queryStr[i] == '"' {
 			quote := queryStr[i]
 			start := i + 1

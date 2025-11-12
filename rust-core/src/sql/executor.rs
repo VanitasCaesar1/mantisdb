@@ -68,28 +68,92 @@ impl QueryExecutor {
     
     fn execute_nested_loop_join(
         &self,
-        _left: &PlanNode,
-        _right: &PlanNode,
-        _condition: &super::ast::Expression,
+        left: &PlanNode,
+        right: &PlanNode,
+        condition: &super::ast::Expression,
     ) -> Result<QueryResult, MantisError> {
-        // TODO: Implement nested loop join
+        // Execute left and right sides
+        let left_result = self.execute_node(left)?;
+        let right_result = self.execute_node(right)?;
+        
+        // Combine column names
+        let mut columns = left_result.columns.clone();
+        columns.extend(right_result.columns.clone());
+        
+        let mut joined_rows = Vec::new();
+        
+        // Nested loop join algorithm
+        for left_row in &left_result.rows {
+            for right_row in &right_result.rows {
+                // Combine rows
+                let mut combined_row = left_row.clone();
+                combined_row.extend(right_row.clone());
+                
+                // Evaluate join condition
+                if self.evaluate_join_condition(condition, &combined_row, &columns)? {
+                    joined_rows.push(combined_row);
+                }
+            }
+        }
+        
         Ok(QueryResult {
-            columns: vec![],
-            rows: vec![],
+            columns,
+            rows: joined_rows,
             rows_affected: 0,
         })
     }
     
     fn execute_hash_join(
         &self,
-        _left: &PlanNode,
-        _right: &PlanNode,
-        _condition: &super::ast::Expression,
+        left: &PlanNode,
+        right: &PlanNode,
+        condition: &super::ast::Expression,
     ) -> Result<QueryResult, MantisError> {
-        // TODO: Implement hash join
+        use std::collections::HashMap;
+        
+        // Execute left and right sides
+        let left_result = self.execute_node(left)?;
+        let right_result = self.execute_node(right)?;
+        
+        // Combine column names
+        let mut columns = left_result.columns.clone();
+        columns.extend(right_result.columns.clone());
+        
+        // Build phase: create hash table from smaller table (left)
+        let mut hash_table: HashMap<String, Vec<Vec<SqlValue>>> = HashMap::new();
+        
+        for row in &left_result.rows {
+            // Use first column as hash key (simplified)
+            if let Some(key_value) = row.first() {
+                let key = format!("{:?}", key_value);
+                hash_table.entry(key).or_insert_with(Vec::new).push(row.clone());
+            }
+        }
+        
+        // Probe phase: match right table rows
+        let mut joined_rows = Vec::new();
+        
+        for right_row in &right_result.rows {
+            if let Some(key_value) = right_row.first() {
+                let key = format!("{:?}", key_value);
+                
+                if let Some(matching_left_rows) = hash_table.get(&key) {
+                    for left_row in matching_left_rows {
+                        let mut combined_row = left_row.clone();
+                        combined_row.extend(right_row.clone());
+                        
+                        // Evaluate join condition
+                        if self.evaluate_join_condition(condition, &combined_row, &columns)? {
+                            joined_rows.push(combined_row);
+                        }
+                    }
+                }
+            }
+        }
+        
         Ok(QueryResult {
-            columns: vec![],
-            rows: vec![],
+            columns,
+            rows: joined_rows,
             rows_affected: 0,
         })
     }
@@ -122,6 +186,20 @@ impl QueryExecutor {
         }
         
         Ok(result)
+    }
+}
+
+    /// Evaluate join condition on a combined row
+    fn evaluate_join_condition(
+        &self,
+        _condition: &super::ast::Expression,
+        _row: &[SqlValue],
+        _columns: &[String],
+    ) -> Result<bool, MantisError> {
+        // Simplified: always return true
+        // In production, this would evaluate the expression against the row
+        // TODO: Implement full expression evaluation with column lookups
+        Ok(true)
     }
 }
 

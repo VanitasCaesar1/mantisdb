@@ -1,3 +1,4 @@
+//go:build !rust
 // +build !rust
 
 package storage

@@ -86,19 +86,19 @@ type LegacyConfig struct {
 
 // MantisDB represents the main database instance
 type MantisDB struct {
-	config           *config.Config
-	legacyConfig     *LegacyConfig
-	storageEngine    storage.StorageEngine
-	cacheManager     *cache.CacheManager
-	queryParser      *query.Parser
-	queryOptimizer   *query.QueryOptimizer
-	queryExecutor    *query.QueryExecutor
-	store            *store.MantisStore
-	apiServer        *api.Server
-	adminServerProc  *os.Process // Rust admin-server process
-	healthChecker    *health.HealthChecker
-	shutdownManager  *shutdown.Manager
-	startupManager   *shutdown.StartupManager
+	config          *config.Config
+	legacyConfig    *LegacyConfig
+	storageEngine   storage.StorageEngine
+	cacheManager    *cache.CacheManager
+	queryParser     *query.Parser
+	queryOptimizer  *query.QueryOptimizer
+	queryExecutor   *query.QueryExecutor
+	store           *store.MantisStore
+	apiServer       *api.Server
+	adminServerProc *os.Process // Rust admin-server process
+	healthChecker   *health.HealthChecker
+	shutdownManager *shutdown.Manager
+	startupManager  *shutdown.StartupManager
 }
 
 func main() {
@@ -299,7 +299,7 @@ func findAvailablePortWithIncrement(startPort int, maxAttempts int, increment in
 	for i := 0; i < maxAttempts; i++ {
 		port := startPort + (i * increment)
 		addr := fmt.Sprintf(":%d", port)
-		
+
 		// Try to listen on the port
 		listener, err := net.Listen("tcp", addr)
 		if err == nil {
@@ -308,7 +308,7 @@ func findAvailablePortWithIncrement(startPort int, maxAttempts int, increment in
 			return port, nil
 		}
 	}
-	
+
 	return 0, fmt.Errorf("no available port found after %d attempts starting from %d", maxAttempts, startPort)
 }
 
@@ -324,25 +324,25 @@ func (db *MantisDB) startAdminServer(ctx context.Context) error {
 	}
 
 	log.Printf("🚀 Starting Rust admin-server...")
-	
+
 	// Don't use CommandContext - we want the process to outlive the startup context
 	// Use Command instead so it runs independently
 	cmd := exec.Command(adminServerPath)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	
+
 	// Set process group ID so we can kill the entire process tree
 	cmd.SysProcAttr = &syscall.SysProcAttr{
 		Setpgid: true,
 	}
-	
+
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start admin server: %v", err)
 	}
 
 	// Store the process in the MantisDB struct so we can kill it on shutdown
 	db.adminServerProc = cmd.Process
-	
+
 	// Monitor the process and properly reap it when it exits
 	// This prevents zombie processes
 	go func() {
@@ -672,7 +672,7 @@ func (db *MantisDB) registerStartupFunctions() {
 		if !db.legacyConfig.BenchmarkOnly {
 			time.Sleep(500 * time.Millisecond)
 		}
-		
+
 		if db.legacyConfig.BenchmarkOnly {
 			fmt.Printf("✓ MantisDB initialized for benchmarking\n")
 		} else {

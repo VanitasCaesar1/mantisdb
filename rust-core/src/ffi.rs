@@ -1,4 +1,9 @@
-//! FFI bindings for Go integration
+//! FFI bindings for Go integration.
+//!
+//! This is the critical bridge between Go and Rust. We use opaque handles
+//! (integers) instead of raw pointers to avoid Go's GC from moving memory
+//! out from under us. The handle->Arc mapping lives entirely in Rust-controlled
+//! memory, safe from Go's GC.
 use std::ffi::CStr;
 use std::os::raw::{c_char, c_int, c_void};
 use std::sync::Arc;
@@ -10,7 +15,9 @@ use crate::storage::LockFreeStorage;
 use crate::cache::LockFreeCache;
 use crate::fast_writer::{FastWriter, FastWriteConfig};
 
-// Global storage for handles
+// Global handle registry - maps opaque integer handles to Rust objects.
+// We use Arc for shared ownership across FFI boundary. Mutex (not RwLock)
+// because handle creation/deletion is infrequent compared to usage.
 lazy_static::lazy_static! {
     static ref STORAGE_HANDLES: Mutex<HashMap<usize, Arc<LockFreeStorage>>> = Mutex::new(HashMap::new());
     static ref CACHE_HANDLES: Mutex<HashMap<usize, Arc<LockFreeCache>>> = Mutex::new(HashMap::new());
@@ -18,7 +25,9 @@ lazy_static::lazy_static! {
     static ref NEXT_HANDLE: Mutex<usize> = Mutex::new(1);
 }
 
-// Helper to get next handle ID
+// Monotonically increasing handle IDs - never reuse even after free.
+// Reusing IDs could let Go code use a stale handle and corrupt data.
+// usize is large enough that we'll never wrap in practice.
 fn next_handle() -> usize {
     let mut handle = NEXT_HANDLE.lock();
     let id = *handle;
@@ -66,6 +75,8 @@ pub extern "C" fn storage_put(
         None => return -1,
     };
 
+    // Trust Go to give us valid pointers and lengths - we can't verify them.
+    // If Go passes bad pointers, we'll segfault. That's the FFI contract.
     let key_slice = unsafe { std::slice::from_raw_parts(key as *const u8, key_len) };
     let key_str = match std::str::from_utf8(key_slice) {
         Ok(s) => s.to_string(),
@@ -109,7 +120,9 @@ pub extern "C" fn storage_get(
             let len = value.len();
             let ptr = value.as_ptr() as *mut u8;
 
-            // Allocate and copy
+            // Allocate with libc malloc (not Rust allocator) because Go will free it.
+            // Go's C.free() must match our malloc, not Rust's internal allocator.
+            // This is a memory ownership handoff across the FFI boundary.
             let buffer = unsafe {
                 let buf = libc::malloc(len) as *mut u8;
                 std::ptr::copy_nonoverlapping(ptr, buf, len);

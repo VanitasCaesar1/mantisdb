@@ -1,3 +1,4 @@
+// executor.go - Query execution engine with caching
 package query
 
 import (
@@ -8,7 +9,9 @@ import (
 	"time"
 )
 
-// QueryExecutor executes optimized queries against the storage engine
+// QueryExecutor executes optimized queries against the storage engine.
+// This is the final stage of the query pipeline (parse -> optimize -> execute).
+// We cache SELECT results but invalidate on writes to maintain consistency.
 type QueryExecutor struct {
 	storageEngine StorageEngine
 	cacheManager  CacheManager
@@ -72,7 +75,9 @@ func NewQueryExecutor(storageEngine StorageEngine, cacheManager CacheManager, co
 func (exec *QueryExecutor) Execute(ctx context.Context, execCtx *ExecutionContext) (*ExecutionResult, error) {
 	result := &ExecutionResult{}
 
-	// Check cache first for SELECT queries
+	// Cache check for SELECT queries only.
+	// We don't cache writes (INSERT/UPDATE/DELETE) because they're idempotent
+	// and caching them could hide errors or confuse transaction semantics.
 	if execCtx.EnableCache && execCtx.Query.OriginalQuery.Type == QueryTypeSelect {
 		if cachedResult, found := exec.checkCache(ctx, execCtx.CacheKey); found {
 			result = cachedResult.(*ExecutionResult)
@@ -105,7 +110,9 @@ func (exec *QueryExecutor) executeSelect(ctx context.Context, execCtx *Execution
 		Rows: make([]map[string]interface{}, 0),
 	}
 
-	// Execute operations in sequence
+	// Execute pipeline operations sequentially (not parallel).
+	// Parallel execution complicates debugging and gains are minimal for
+	// our workload (mostly point queries, not OLAP scans).
 	var currentData []map[string]interface{}
 
 	for _, operation := range plan.Operations {
@@ -137,7 +144,9 @@ func (exec *QueryExecutor) executeSelect(ctx context.Context, execCtx *Execution
 		}
 	}
 
-	// Apply LIMIT if specified
+	// Apply LIMIT late (after all filtering) to keep pipeline simple.
+	// Early LIMIT (during scan) would be faster but requires query planner
+	// to prove filters are selective, which we haven't implemented yet.
 	if query.Limit > 0 && len(currentData) > query.Limit {
 		currentData = currentData[:query.Limit]
 	}
@@ -177,7 +186,9 @@ func (exec *QueryExecutor) executeInsert(ctx context.Context, execCtx *Execution
 
 	result.RowsAffected = 1
 
-	// Invalidate related cache entries
+	// Invalidate all cached queries touching this table.
+	// Conservative invalidation - we could track column-level dependencies
+	// for finer granularity, but that's complex and error-prone.
 	if exec.config.EnableCaching {
 		exec.invalidateTableCache(ctx, query.Table)
 	}

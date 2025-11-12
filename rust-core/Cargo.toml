@@ -34,6 +34,10 @@ axum = "0.7"
 tower = { version = "0.4", features = ["full"] }
 tower-http = { version = "0.5", features = ["cors", "trace", "compression-full", "fs"] }
 
+# Static asset embedding and MIME detection
+include_dir = "0.7"
+mime_guess = "2.0"
+
 # Connection pooling
 deadpool = { version = "0.10", features = ["rt_tokio_1"] }
 bb8 = "0.8"
@@ -126,3 +130,7 @@ harness = false
 [[bin]]
 name = "admin-server"
 path = "src/bin/admin-server.rs"
+
+[[bin]]
+name = "mantisdb-migrate"
+path = "src/bin/mantisdb-migrate.rs"

@@ -1,13 +1,20 @@
+// storage_interface.go - Core storage abstraction layer
 package storage
 
 import "context"
 
-// StorageEngine defines the interface for storage operations
+// StorageEngine defines the interface for storage operations.
+// We use an interface here (not concrete types) because we have multiple
+// implementations: pure Go, CGO-based, and Rust FFI. The interface lets
+// us swap engines at runtime without changing application code.
 type StorageEngine interface {
-	// Initialize the storage engine
+	// Init creates/opens the database at dataDir.
+	// Must be called before any other operations - we enforce this at
+	// the application layer, not with locks, to avoid initialization overhead.
 	Init(dataDir string) error
 
-	// Close the storage engine
+	// Close flushes pending writes and releases file handles.
+	// After Close, the engine is unusable - calling other methods will panic.
 	Close() error
 
 	// Basic key-value operations
@@ -15,12 +22,17 @@ type StorageEngine interface {
 	Get(ctx context.Context, key string) (string, error)
 	Delete(ctx context.Context, key string) error
 
-	// Batch operations
+	// Batch operations reduce write amplification by grouping ops.
+	// These are atomic within a single batch - either all succeed or all fail.
+	// We use maps/slices (not variadic args) because benchmarks showed better
+	// performance with pre-allocated collections for large batches.
 	BatchPut(ctx context.Context, kvPairs map[string]string) error
 	BatchGet(ctx context.Context, keys []string) (map[string]string, error)
 	BatchDelete(ctx context.Context, keys []string) error
 
-	// Iterator support
+	// NewIterator creates a forward-only cursor for range scans.
+	// Prefix filtering happens at the storage layer (not in Go) to avoid
+	// unnecessary data transfer across FFI boundaries.
 	NewIterator(ctx context.Context, prefix string) (Iterator, error)
 
 	// Transaction support
@@ -66,11 +78,14 @@ type Transaction interface {
 	Rollback() error
 }
 
-// StorageConfig holds configuration for storage engines
+// StorageConfig holds configuration for storage engines.
 type StorageConfig struct {
 	DataDir    string
-	BufferSize int64
-	CacheSize  int64
-	UseCGO     bool
+	BufferSize int64 // Write buffer - larger = better throughput, more memory
+	CacheSize  int64 // Read cache - keep hot data in RAM
+	UseCGO     bool  // Use C-based engine (faster but less portable)
+	// SyncWrites forces fsync on every write. Slower but safer.
+	// We default to false and rely on periodic checkpoints for durability
+	// because most workloads can tolerate losing a few seconds of data.
 	SyncWrites bool
 }

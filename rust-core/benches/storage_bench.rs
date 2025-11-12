@@ -57,7 +57,8 @@ fn bench_concurrent_access(c: &mut Criterion) {
             BenchmarkId::from_parameter(threads),
             threads,
             |b, &threads| {
-                let storage = Arc::new(LockFreeStorage::new(1024 * 1024).expect("Failed to create storage"));
+                let storage =
+                    Arc::new(LockFreeStorage::new(1024 * 1024).expect("Failed to create storage"));
 
                 b.iter(|| {
                     let mut handles = vec![];

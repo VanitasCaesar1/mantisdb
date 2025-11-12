@@ -140,10 +140,10 @@ func GetStressTestConfig(level string) *StressTestConfig {
 		base.OperationsPerSec = 2000
 		base.DataSize = 2048
 	case "extreme":
-		base.Duration = 90 * time.Second // Reduced from 180s
+		base.Duration = 90 * time.Second       // Reduced from 180s
 		base.NumWorkers = runtime.NumCPU() * 3 // 30 workers instead of 60
-		base.OperationsPerSec = 2000 // Reduced from 3000
-		base.DataSize = 1024 // Reduced from 2KB to 1KB
+		base.OperationsPerSec = 2000           // Reduced from 3000
+		base.DataSize = 1024                   // Reduced from 2KB to 1KB
 	}
 
 	base.StressLevel = level
@@ -324,7 +324,7 @@ func (pbs *ProductionBenchmarkSuite) benchmarkHighThroughput(ctx context.Context
 	for w := 0; w < pbs.config.NumWorkers; w++ {
 		wg.Add(1)
 		semaphore <- struct{}{} // Acquire
-		
+
 		go func(workerID int) {
 			defer wg.Done()
 			defer func() { <-semaphore }() // Release
@@ -352,7 +352,7 @@ func (pbs *ProductionBenchmarkSuite) benchmarkHighThroughput(ctx context.Context
 				opStart := time.Now()
 
 				key := fmt.Sprintf("throughput_key_%d_%d", workerID, i)
-				
+
 				// Get buffer from pool
 				value := bufferPool.Get().([]byte)
 				// Cheap data generation: copy pre-seeded data and stamp identifiers
@@ -381,7 +381,7 @@ func (pbs *ProductionBenchmarkSuite) benchmarkHighThroughput(ctx context.Context
 				if err != nil {
 					atomic.AddInt64(&errorCount, 1)
 				}
-				
+
 				// Yield to prevent CPU starvation
 				if i%100 == 0 {
 					runtime.Gosched()

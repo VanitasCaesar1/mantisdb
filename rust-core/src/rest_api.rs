@@ -166,12 +166,17 @@ impl RestApiServer {
             .route("/health", get(health_handler))
             .route("/stats", get(stats_handler))
             
-            // Key-Value API
+            // Key-Value API (versioned and unversioned aliases)
             .route("/api/v1/kv/:key", get(kv_get_handler))
             .route("/api/v1/kv/:key", put(kv_set_handler))
             .route("/api/v1/kv/:key", delete(kv_delete_handler))
             .route("/api/v1/kv", post(kv_batch_handler))
             .route("/api/v1/kv", get(kv_list_handler))
+            .route("/api/kv/:key", get(kv_get_handler))
+            .route("/api/kv/:key", put(kv_set_handler))
+            .route("/api/kv/:key", delete(kv_delete_handler))
+            .route("/api/kv", post(kv_batch_handler))
+            .route("/api/kv", get(kv_list_handler))
             
             // Table API (PostgREST-like)
             .route("/api/v1/tables/:table", get(table_query_handler))
@@ -179,6 +184,11 @@ impl RestApiServer {
             .route("/api/v1/tables/:table/:id", get(table_get_handler))
             .route("/api/v1/tables/:table/:id", put(table_update_handler))
             .route("/api/v1/tables/:table/:id", delete(table_delete_handler))
+            .route("/api/tables/:table", get(table_query_handler))
+            .route("/api/tables/:table", post(table_insert_handler))
+            .route("/api/tables/:table/:id", get(table_get_handler))
+            .route("/api/tables/:table/:id", put(table_update_handler))
+            .route("/api/tables/:table/:id", delete(table_delete_handler))
             
             .with_state(state);
 
@@ -287,7 +297,11 @@ async fn kv_set_handler(
     Json(req): Json<KvSetRequest>,
 ) -> Result<impl IntoResponse> {
     let conn = state.pool.acquire().await?;
-    conn.storage().put(key.as_bytes(), &req.value)?;
+    if let Some(ttl) = req.ttl {
+        conn.storage().put_with_ttl(key.clone(), req.value.clone(), ttl)?;
+    } else {
+        conn.storage().put(key.as_bytes(), &req.value)?;
+    }
 
     Ok(Json(ApiResponse {
         success: true,
@@ -404,26 +418,43 @@ async fn kv_batch_handler(
     }))
 }
 
-/// KV List handler
+/// KV List handler with pagination and prefix filtering
 async fn kv_list_handler(
     State(state): State<AppState>,
-    Query(_params): Query<ListParams>,
+    Query(params): Query<ListParams>,
 ) -> Result<impl IntoResponse> {
-    let _conn = state.pool.acquire().await?;
+    let conn = state.pool.acquire().await?;
+    let storage = conn.storage();
     
-    // This is a simplified implementation
-    // In production, you'd want to implement proper iteration
-    let keys: Vec<String> = vec![]; // Placeholder
+    // Get prefix filter or empty string for all keys
+    let prefix = params.prefix.as_deref().unwrap_or("");
+    
+    // Scan with prefix
+    let all_results = storage.scan_prefix(prefix);
+    
+    let total = all_results.len();
+    let limit = params.limit.unwrap_or(100).min(1000); // Cap at 1000
+    let offset = params.offset.unwrap_or(0);
+    
+    // Paginate results
+    let keys: Vec<String> = all_results
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .map(|(key, _value)| key)
+        .collect();
+    
+    let count = keys.len();
 
     Ok(Json(ApiResponse {
         success: true,
         data: Some(keys),
         error: None,
         meta: Some(ResponseMeta {
-            count: Some(0),
-            total: Some(0),
-            page: None,
-            per_page: None,
+            count: Some(count),
+            total: Some(total),
+            page: Some(offset / limit),
+            per_page: Some(limit),
         }),
     }))
 }
@@ -432,21 +463,37 @@ async fn kv_list_handler(
 async fn table_query_handler(
     State(state): State<AppState>,
     Path(table): Path<String>,
-    Query(_params): Query<HashMap<String, String>>,
+    Query(params): Query<HashMap<String, String>>,
 ) -> Result<impl IntoResponse> {
-    let _conn = state.pool.acquire().await?;
-    
-    // Implement table querying logic here
-    // This would parse query parameters and execute queries
-    
+    let conn = state.pool.acquire().await?;
+    let storage = conn.storage();
+
+    let limit = params.get("limit").and_then(|s| s.parse::<usize>().ok()).unwrap_or(100);
+    let offset = params.get("offset").and_then(|s| s.parse::<usize>().ok()).unwrap_or(0);
+
+    let prefix = format!("table/{}/", table);
+    let mut items = storage.scan_prefix(&prefix);
+    items.sort_by(|a, b| a.0.cmp(&b.0));
+
+    let total = items.len();
+    let rows: Vec<serde_json::Value> = items
+        .into_iter()
+        .skip(offset)
+        .take(limit)
+        .filter_map(|(_k, v)| serde_json::from_slice::<serde_json::Value>(&v).ok())
+        .collect();
+
     Ok(Json(ApiResponse {
         success: true,
         data: Some(serde_json::json!({
             "table": table,
-            "rows": []
+            "rows": rows,
+            "total": total,
+            "limit": limit,
+            "offset": offset
         })),
         error: None,
-        meta: None,
+        meta: Some(ResponseMeta { count: Some(rows.len()), total: Some(total), page: Some(offset / limit.max(1)), per_page: Some(limit) }),
     }))
 }
 
@@ -454,16 +501,19 @@ async fn table_query_handler(
 async fn table_insert_handler(
     State(state): State<AppState>,
     Path(table): Path<String>,
-    Json(_data): Json<serde_json::Value>,
+    Json(data): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse> {
-    let _conn = state.pool.acquire().await?;
-    
-    // Implement insert logic here
-    
+    let conn = state.pool.acquire().await?;
+    let id = data.get("id").and_then(|v| v.as_str()).map(|s| s.to_string()).unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let key = format!("table/{}/{}", table, id);
+let bytes = serde_json::to_vec(&data).map_err(|e| Error::SerializationError(format!("Invalid JSON: {}", e)))?;
+    conn.storage().put(key.as_bytes(), &bytes)?;
+
     Ok(Json(ApiResponse {
         success: true,
         data: Some(serde_json::json!({
             "table": table,
+            "id": id,
             "inserted": 1
         })),
         error: None,
@@ -476,16 +526,17 @@ async fn table_get_handler(
     State(state): State<AppState>,
     Path((table, id)): Path<(String, String)>,
 ) -> Result<impl IntoResponse> {
-    let _conn = state.pool.acquire().await?;
-    
-    // Implement get logic here
-    
+    let conn = state.pool.acquire().await?;
+    let key = format!("table/{}/{}", table, id);
+    let bytes = conn.storage().get(key.as_bytes())?;
+let row: serde_json::Value = serde_json::from_slice(&bytes).map_err(|e| Error::SerializationError(format!("Invalid stored JSON: {}", e)))?;
+
     Ok(Json(ApiResponse {
         success: true,
         data: Some(serde_json::json!({
             "table": table,
             "id": id,
-            "row": {}
+            "row": row
         })),
         error: None,
         meta: None,
@@ -496,12 +547,13 @@ async fn table_get_handler(
 async fn table_update_handler(
     State(state): State<AppState>,
     Path((table, id)): Path<(String, String)>,
-    Json(_data): Json<serde_json::Value>,
+    Json(data): Json<serde_json::Value>,
 ) -> Result<impl IntoResponse> {
-    let _conn = state.pool.acquire().await?;
-    
-    // Implement update logic here
-    
+    let conn = state.pool.acquire().await?;
+    let key = format!("table/{}/{}", table, id);
+let bytes = serde_json::to_vec(&data).map_err(|e| Error::SerializationError(format!("Invalid JSON: {}", e)))?;
+    conn.storage().put(key.as_bytes(), &bytes)?;
+
     Ok(Json(ApiResponse {
         success: true,
         data: Some(serde_json::json!({
@@ -519,10 +571,10 @@ async fn table_delete_handler(
     State(state): State<AppState>,
     Path((table, id)): Path<(String, String)>,
 ) -> Result<impl IntoResponse> {
-    let _conn = state.pool.acquire().await?;
-    
-    // Implement delete logic here
-    
+    let conn = state.pool.acquire().await?;
+    let key = format!("table/{}/{}", table, id);
+    conn.storage().delete(key.as_bytes())?;
+
     Ok(Json(ApiResponse {
         success: true,
         data: Some(serde_json::json!({

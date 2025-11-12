@@ -3,10 +3,8 @@
 //! This demonstrates how to use the high-performance REST API
 //! with connection pooling for MantisDB.
 
-use mantisdb_core::{
-    ConnectionPool, PoolConfig, RestApiServer, RestApiConfig,
-};
 use mantisdb_core::storage::LockFreeStorage;
+use mantisdb_core::{ConnectionPool, PoolConfig, RestApiConfig, RestApiServer};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing_subscriber;
@@ -34,7 +32,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  • Min Connections: {}", pool_config.min_connections);
     println!("  • Max Connections: {}", pool_config.max_connections);
     println!("  • Max Idle Time: {:?}", pool_config.max_idle_time);
-    println!("  • Connection Timeout: {:?}", pool_config.connection_timeout);
+    println!(
+        "  • Connection Timeout: {:?}",
+        pool_config.connection_timeout
+    );
     println!("  • Max Lifetime: {:?}", pool_config.max_lifetime);
 
     // Create connection pool
@@ -60,7 +61,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("  • Bind Address: {}", api_config.bind_addr);
     println!("  • CORS Enabled: {}", api_config.enable_cors);
     println!("  • Compression: {}", api_config.enable_compression);
-    println!("  • Max Body Size: {} MB", api_config.max_body_size / 1024 / 1024);
+    println!(
+        "  • Max Body Size: {} MB",
+        api_config.max_body_size / 1024 / 1024
+    );
 
     // Create and start REST API server
     let server = RestApiServer::new(api_config, pool.clone());

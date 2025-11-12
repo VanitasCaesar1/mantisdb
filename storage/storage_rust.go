@@ -1,3 +1,4 @@
+//go:build rust
 // +build rust
 
 package storage
@@ -34,7 +35,7 @@ import (
 
 // RustStorageEngine implements StorageEngine using Rust core
 type RustStorageEngine struct {
-	config       StorageConfig
+	config        StorageConfig
 	storageHandle C.uintptr_t
 	cacheHandle   C.uintptr_t
 }
@@ -46,12 +47,12 @@ func NewRustStorageEngine(config StorageConfig) *RustStorageEngine {
 		storageHandle: C.storage_new(),
 		cacheHandle:   C.cache_new(C.size_t(config.CacheSize)),
 	}
-	
+
 	runtime.SetFinalizer(engine, func(e *RustStorageEngine) {
 		C.storage_free(e.storageHandle)
 		C.cache_free(e.cacheHandle)
 	})
-	
+
 	return engine
 }
 
@@ -69,11 +70,11 @@ func (s *RustStorageEngine) Close() error {
 func (s *RustStorageEngine) Put(ctx context.Context, key, value string) error {
 	keyBytes := []byte(key)
 	valueBytes := []byte(value)
-	
+
 	// Try cache first
 	cKey := (*C.char)(unsafe.Pointer(&keyBytes[0]))
 	cValue := (*C.uint8_t)(unsafe.Pointer(&valueBytes[0]))
-	
+
 	result := C.cache_put(
 		s.cacheHandle,
 		cKey,
@@ -82,7 +83,7 @@ func (s *RustStorageEngine) Put(ctx context.Context, key, value string) error {
 		C.size_t(len(valueBytes)),
 		0, // No TTL
 	)
-	
+
 	// Always write to storage
 	result = C.storage_put(
 		s.storageHandle,
@@ -91,22 +92,22 @@ func (s *RustStorageEngine) Put(ctx context.Context, key, value string) error {
 		cValue,
 		C.size_t(len(valueBytes)),
 	)
-	
+
 	if result != 0 {
 		return errors.New("failed to put key-value")
 	}
-	
+
 	return nil
 }
 
 func (s *RustStorageEngine) Get(ctx context.Context, key string) (string, error) {
 	keyBytes := []byte(key)
 	cKey := (*C.char)(unsafe.Pointer(&keyBytes[0]))
-	
+
 	// Try cache first
 	var cValue *C.uint8_t
 	var cValueLen C.size_t
-	
+
 	result := C.cache_get(
 		s.cacheHandle,
 		cKey,
@@ -114,14 +115,14 @@ func (s *RustStorageEngine) Get(ctx context.Context, key string) (string, error)
 		&cValue,
 		&cValueLen,
 	)
-	
+
 	if result == 0 && cValue != nil {
 		// Cache hit
 		value := C.GoBytes(unsafe.Pointer(cValue), C.int(cValueLen))
 		C.rust_free(cValue)
 		return string(value), nil
 	}
-	
+
 	// Cache miss - get from storage
 	result = C.storage_get(
 		s.storageHandle,
@@ -130,14 +131,14 @@ func (s *RustStorageEngine) Get(ctx context.Context, key string) (string, error)
 		&cValue,
 		&cValueLen,
 	)
-	
+
 	if result != 0 || cValue == nil {
 		return "", errors.New("key not found")
 	}
-	
+
 	value := C.GoBytes(unsafe.Pointer(cValue), C.int(cValueLen))
 	C.rust_free(cValue)
-	
+
 	// Update cache
 	cValuePtr := (*C.uint8_t)(unsafe.Pointer(&value[0]))
 	C.cache_put(
@@ -148,28 +149,28 @@ func (s *RustStorageEngine) Get(ctx context.Context, key string) (string, error)
 		C.size_t(len(value)),
 		3600, // 1 hour TTL
 	)
-	
+
 	return string(value), nil
 }
 
 func (s *RustStorageEngine) Delete(ctx context.Context, key string) error {
 	keyBytes := []byte(key)
 	cKey := (*C.char)(unsafe.Pointer(&keyBytes[0]))
-	
+
 	// Delete from cache
 	C.cache_delete(s.cacheHandle, cKey, C.size_t(len(keyBytes)))
-	
+
 	// Delete from storage
 	result := C.storage_delete(
 		s.storageHandle,
 		cKey,
 		C.size_t(len(keyBytes)),
 	)
-	
+
 	if result != 0 {
 		return errors.New("failed to delete key")
 	}
-	
+
 	return nil
 }
 
@@ -230,16 +231,16 @@ func (s *RustStorageEngine) HealthCheck(ctx context.Context) error {
 func (s *RustStorageEngine) GetStats() map[string]interface{} {
 	var reads, writes, deletes C.uint64_t
 	C.storage_stats(s.storageHandle, &reads, &writes, &deletes)
-	
+
 	var hits, misses, evictions C.uint64_t
 	C.cache_stats(s.cacheHandle, &hits, &misses, &evictions)
-	
+
 	hitRate := float64(0)
 	total := uint64(hits) + uint64(misses)
 	if total > 0 {
 		hitRate = float64(hits) / float64(total)
 	}
-	
+
 	return map[string]interface{}{
 		"storage": map[string]interface{}{
 			"reads":   uint64(reads),

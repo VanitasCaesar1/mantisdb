@@ -368,7 +368,7 @@ func (cwo *ColumnarWriteOptimizer) WriteRow(ctx context.Context, table string, r
 
 // SQLWriteOptimizer provides optimized SQL writes
 type SQLWriteOptimizer struct {
-	Optimizer       *WriteOptimizer
+	Optimizer         *WriteOptimizer
 	preparedStmtCache sync.Map // Cache for prepared statements
 }
 

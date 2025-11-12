@@ -1,3 +1,4 @@
+// recovery.go - Crash recovery via write-ahead log replay
 package wal
 
 import (
@@ -11,22 +12,27 @@ import (
 	"time"
 )
 
-// WALReader provides functionality to read WAL entries for recovery operations
+// WALReader provides functionality to read WAL entries for recovery operations.
+// This is the critical crash recovery path - if the DB crashes mid-transaction,
+// we replay the WAL to restore committed transactions and discard uncommitted ones.
 type WALReader struct {
 	walDir string
 	files  []string // Sorted list of WAL files
 }
 
-// RecoveryPlan contains information about what needs to be recovered
+// RecoveryPlan contains information about what needs to be recovered.
 type RecoveryPlan struct {
-	StartLSN         uint64                       // Starting LSN for recovery
-	EndLSN           uint64                       // Ending LSN for recovery
-	Operations       []*WALEntry                  // Operations to replay
-	Transactions     map[uint64]*TransactionState // Transaction states
-	CorruptedEntries []CorruptedEntry             // Corrupted entries found
+	// StartLSN/EndLSN define the recovery window.
+	// We scan from StartLSN (last checkpoint) to EndLSN (end of log).
+	// Anything before StartLSN is already durable in the data files.
+	StartLSN         uint64
+	EndLSN           uint64
+	Operations       []*WALEntry                  // Ops to replay in LSN order
+	Transactions     map[uint64]*TransactionState // Track commit/abort state
+	CorruptedEntries []CorruptedEntry             // Corruption detected
 }
 
-// TransactionState tracks the state of a transaction during recovery
+// TransactionState tracks the state of a transaction during recovery.
 type TransactionState struct {
 	TxnID      uint64
 	Status     TransactionStatus
@@ -36,7 +42,9 @@ type TransactionState struct {
 	StartTime  time.Time
 	EndTime    time.Time
 
-	// For rollback support
+	// Redo/undo logs implement the ARIES recovery algorithm:
+	// - Redo: replay committed transactions forward from checkpoint
+	// - Undo: roll back uncommitted transactions backward from crash point
 	UndoOperations []*WALEntry
 	RedoOperations []*WALEntry
 
@@ -63,7 +71,12 @@ type CorruptedEntry struct {
 	Error    error
 }
 
-// RecoveryEngine handles crash recovery and WAL replay operations
+// RecoveryEngine handles crash recovery and WAL replay operations.
+// This is invoked on startup if we detect an unclean shutdown.
+// Recovery has three phases (ARIES algorithm):
+// 1. Analysis: scan WAL to build transaction table
+// 2. Redo: replay all operations from checkpoint forward
+// 3. Undo: roll back uncommitted transactions backward
 type RecoveryEngine struct {
 	walDir    string
 	reader    *WALReader
@@ -115,19 +128,26 @@ type RecoveryProgress struct {
 	Error           error
 }
 
-// RecoveryConfig holds configuration for recovery operations
+// RecoveryConfig holds configuration for recovery operations.
 type RecoveryConfig struct {
-	MaxRetries          int           // Maximum retries for failed operations
-	RetryDelay          time.Duration // Delay between retries
+	MaxRetries          int
+	RetryDelay          time.Duration
 	ValidationMode      ValidationMode
-	CrashDetectionFile  string // File to detect unclean shutdown
-	ProgressReporting   bool   // Whether to report progress
-	StrictValidation    bool   // Whether to use strict validation
-	ParallelRecovery    bool   // Whether to enable parallel recovery
-	MaxParallelWorkers  int    // Maximum parallel workers
-	SafeModeOnFailure   bool   // Whether to enter safe mode on recovery failure
-	ConsistencyChecks   bool   // Whether to perform consistency checks
-	DataIntegrityChecks bool   // Whether to perform data integrity checks
+	CrashDetectionFile  string // Deleted on clean shutdown, present after crash
+	ProgressReporting   bool
+	// StrictValidation fails recovery on checksum mismatch.
+	// We default to false (relaxed) because corrupted tail entries after
+	// crash are expected - only the committed prefix matters.
+	StrictValidation bool
+	// ParallelRecovery replays independent transactions concurrently.
+	// Disabled by default - correctness over speed during recovery.
+	ParallelRecovery   bool
+	MaxParallelWorkers int
+	// SafeModeOnFailure starts in read-only mode if recovery fails.
+	// Better to serve stale data than corrupt or lose data.
+	SafeModeOnFailure   bool
+	ConsistencyChecks   bool
+	DataIntegrityChecks bool
 }
 
 // ValidationMode defines how strict validation should be

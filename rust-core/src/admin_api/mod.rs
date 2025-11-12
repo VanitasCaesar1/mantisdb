@@ -22,12 +22,12 @@ use axum::{
     routing::{get, post, put, delete},
     middleware,
     response::{Html, IntoResponse},
-    http::StatusCode,
+    extract::Path,
+    http::{StatusCode, header::HeaderValue},
 };
 use tower_http::cors::CorsLayer;
 use tower_http::trace::TraceLayer;
 use tower_http::compression::CompressionLayer;
-use tower_http::services::ServeDir;
 use std::sync::Arc;
 
 use crate::rls::RlsEngine;
@@ -35,6 +35,9 @@ use crate::storage::LockFreeStorage;
 use crate::persistent_storage::{PersistentStorage, PersistentStorageConfig};
 use self::security::{rate_limit_middleware, security_headers_middleware};
 use std::sync::Mutex;
+
+use include_dir::{include_dir, Dir};
+use mime_guess::MimeGuess;
 
 /// Admin API state shared across handlers
 #[derive(Clone)]
@@ -89,19 +92,14 @@ impl AdminState {
     }
 }
 
-/// Serve the OpenAPI specification
+/// Serve the OpenAPI specification (embedded at build time)
 async fn serve_openapi_spec() -> impl IntoResponse {
-    match std::fs::read_to_string("rust-core/openapi.yaml") {
-        Ok(content) => (
-            StatusCode::OK,
-            [("Content-Type", "text/yaml")],
-            content,
-        ).into_response(),
-        Err(_) => (
-            StatusCode::NOT_FOUND,
-            "OpenAPI spec not found",
-        ).into_response(),
-    }
+    const OPENAPI_YAML: &str = include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/openapi.yaml"));
+    (
+        StatusCode::OK,
+        [("Content-Type", "text/yaml")],
+        OPENAPI_YAML,
+    )
 }
 
 /// Serve Swagger UI for API documentation
@@ -145,12 +143,51 @@ async fn serve_api_docs() -> impl IntoResponse {
     "#)
 }
 
+/// Embedded admin UI assets directory
+static ASSETS: Dir = include_dir!("../../admin/api/assets/dist");
+
+/// Serve embedded index.html
+async fn serve_index() -> impl IntoResponse {
+    if let Some(file) = ASSETS.get_file("index.html") {
+        let body = file.contents();
+        return (
+            StatusCode::OK,
+            [("Content-Type", "text/html; charset=utf-8")],
+            body.to_vec(),
+        );
+    }
+    (StatusCode::NOT_FOUND, "Admin UI not found")
+}
+
+/// Serve any embedded static asset, falling back to index.html for SPA routes
+async fn serve_static(Path(path): Path<String>) -> impl IntoResponse {
+    let req_path = if path.is_empty() { "index.html".to_string() } else { path };
+
+    if let Some(file) = ASSETS.get_file(&req_path) {
+        // Guess MIME type
+        let mime: MimeGuess = mime_guess::from_path(&req_path);
+        let content_type = mime.first_or_octet_stream().essence_str().to_string();
+        return (
+            StatusCode::OK,
+            [("Content-Type", content_type.as_str())],
+            file.contents().to_vec(),
+        );
+    }
+
+    // SPA fallback to index.html
+    if let Some(index) = ASSETS.get_file("index.html") {
+        return (
+            StatusCode::OK,
+            [("Content-Type", "text/html; charset=utf-8")],
+            index.contents().to_vec(),
+        );
+    }
+
+    (StatusCode::NOT_FOUND, "Not found")
+}
+
 /// Build the complete admin API router
 pub fn build_admin_router(state: AdminState) -> Router {
-    // Serve static files from admin/api/assets/dist
-    let serve_dir = ServeDir::new("admin/api/assets/dist")
-        .append_index_html_on_directories(true);
-    
     Router::new()
         // API Documentation
         .route("/api/docs", get(serve_api_docs))
@@ -262,12 +299,14 @@ pub fn build_admin_router(state: AdminState) -> Router {
         .route("/api/ws/logs", get(logs::logs_stream))
         .route("/api/ws/events", get(monitoring::events_stream))
         
+        // Static admin UI (embedded)
+        .route("/", get(serve_index))
+        .route("/*path", get(serve_static))
+        
         .with_state(state)
         .layer(middleware::from_fn(security_headers_middleware))
         .layer(middleware::from_fn(rate_limit_middleware))
         .layer(CompressionLayer::new())
         .layer(CorsLayer::permissive())
         .layer(TraceLayer::new_for_http())
-        // Serve static files for all other routes (must be last)
-        .fallback_service(serve_dir)
 }

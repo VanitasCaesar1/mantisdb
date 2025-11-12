@@ -1,7 +1,7 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion, BatchSize};
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 use mantisdb_core::storage::LockFreeStorage;
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 
 fn bench_kv_put(c: &mut Criterion) {
     let mut group = c.benchmark_group("kv_put");

@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use mantisdb_core::storage::LockFreeStorage;
-use rand::{Rng, SeedableRng};
 use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
 use std::sync::Arc;
 use std::thread;
 
@@ -22,16 +22,19 @@ fn mixed_extreme_workload(c: &mut Criterion) {
                     for i in 0..10_000u32 {
                         let op = rng.gen::<u8>() % 4;
                         match op {
-                            0 | 1 => { // put
+                            0 | 1 => {
+                                // put
                                 let key = format!("m:{}:{}", t, i);
                                 let val: Vec<u8> = (0..256).map(|_| rng.gen::<u8>()).collect();
                                 let _ = s.put(key.as_bytes(), &val);
                             }
-                            2 => { // get
+                            2 => {
+                                // get
                                 let key = format!("m:{}:{}", t, rng.gen::<u32>() % 10_000);
                                 let _ = s.get(key.as_bytes());
                             }
-                            _ => { // delete
+                            _ => {
+                                // delete
                                 let key = format!("m:{}:{}", t, rng.gen::<u32>() % 10_000);
                                 let _ = s.delete(key.as_bytes());
                             }
@@ -41,7 +44,9 @@ fn mixed_extreme_workload(c: &mut Criterion) {
                 handles.push(handle);
             }
 
-            for h in handles { let _ = h.join(); }
+            for h in handles {
+                let _ = h.join();
+            }
         })
     });
 

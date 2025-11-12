@@ -1,3 +1,4 @@
+// cache_manager.go - Intelligent cache with dependency tracking and TTL
 package cache
 
 import (
@@ -6,7 +7,10 @@ import (
 	"time"
 )
 
-// CacheManager handles intelligent caching with dependency tracking
+// CacheManager handles intelligent caching with dependency tracking.
+// Dependency tracking lets us invalidate derived data when source data changes.
+// For example, if we cache a query result that depends on tables A and B,
+// we automatically invalidate the result when A or B are modified.
 type CacheManager struct {
 	entries    map[string]*CacheEntry
 	mutex      sync.RWMutex
@@ -35,7 +39,7 @@ type CacheConfig struct {
 	EvictionPolicy  string // "lru", "lfu", "ttl"
 }
 
-// NewCacheManager creates a new cache manager
+// NewCacheManager creates a new cache manager.
 func NewCacheManager(config CacheConfig) *CacheManager {
 	cm := &CacheManager{
 		entries:    make(map[string]*CacheEntry),
@@ -44,7 +48,9 @@ func NewCacheManager(config CacheConfig) *CacheManager {
 		config:     config,
 	}
 
-	// Start background cleanup
+	// Background cleanup runs asynchronously to avoid blocking puts/gets.
+	// We use a goroutine (not a timer in the main thread) because cleanup
+	// can be slow when evicting thousands of expired entries.
 	go cm.backgroundCleanup()
 
 	return cm
@@ -60,13 +66,16 @@ func (cm *CacheManager) Get(ctx context.Context, key string) (interface{}, bool)
 		return nil, false
 	}
 
-	// Check if expired
+	// Lazy expiration check - cheaper than background scanning every entry.
+	// Trade-off: expired entries may linger briefly, but we save CPU.
 	if cm.isExpired(entry) {
 		cm.Delete(ctx, key)
 		return nil, false
 	}
 
-	// Update access statistics
+	// Track access patterns for LFU/LRU eviction.
+	// We use a write lock here (not atomic ops) because we need consistency
+	// with the entry map - atomic ops would create race conditions.
 	cm.mutex.Lock()
 	entry.AccessCount++
 	entry.LastAccess = time.Now()
@@ -80,10 +89,13 @@ func (cm *CacheManager) Put(ctx context.Context, key string, value interface{}, 
 	cm.mutex.Lock()
 	defer cm.mutex.Unlock()
 
-	// Calculate size (simplified)
+	// Size calculation is approximate - exact sizing is too expensive.
+	// We optimize for speed over precision because Put is in the hot path.
 	size := cm.calculateSize(value)
 
-	// Check if we need to evict
+	// Evict proactively to keep memory under MaxSize.
+	// We evict *before* inserting (not after) to avoid temporarily exceeding
+	// the limit, which could cause OOM if we're close to system memory cap.
 	if cm.needsEviction(size) {
 		cm.evict(size)
 	}
@@ -124,7 +136,8 @@ func (cm *CacheManager) Delete(ctx context.Context, key string) {
 		cm.depGraph.RemoveNode(key)
 		cm.ttlManager.Cancel(key)
 
-		// Invalidate dependents
+		// Cascade invalidation - when A is deleted, all entries depending on A
+		// must also be invalidated. This prevents serving stale derived data.
 		dependents := cm.depGraph.GetDependents(key)
 		for _, dependent := range dependents {
 			cm.invalidateKey(dependent)

@@ -680,7 +680,7 @@ func (ms *MantisStore) ListTables(ctx context.Context) ([]map[string]interface{}
 				}
 			}
 		}
-		
+
 		// Convert counts to table info
 		for collection, count := range collectionCounts {
 			if !seenNames[collection] {

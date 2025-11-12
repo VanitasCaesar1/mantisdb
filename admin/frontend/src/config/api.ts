@@ -33,9 +33,9 @@ export function getApiConfig(): ApiConfig {
     };
   }
   
-  // Local production build: Use localhost:8080
+  // Local production build: Use localhost:8081 (Rust admin server)
   return {
-    baseUrl: 'http://localhost:8080',
+    baseUrl: 'http://localhost:8081',
   };
 }
 

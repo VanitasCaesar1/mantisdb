@@ -71,14 +71,14 @@ func DefaultPoolConfig() *PoolConfig {
 
 // PoolStats holds connection pool statistics
 type PoolStats struct {
-	TotalConnections     int
-	ActiveConnections    int
-	IdleConnections      int
-	WaitCount            uint64
-	AvgWaitTimeMs        uint64
-	ConnectionsCreated   uint64
-	ConnectionsClosed    uint64
-	HealthCheckFailures  uint64
+	TotalConnections    int
+	ActiveConnections   int
+	IdleConnections     int
+	WaitCount           uint64
+	AvgWaitTimeMs       uint64
+	ConnectionsCreated  uint64
+	ConnectionsClosed   uint64
+	HealthCheckFailures uint64
 }
 
 // ConnectionPool manages a pool of database connections using Rust backend

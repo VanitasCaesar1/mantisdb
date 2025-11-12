@@ -1,13 +1,17 @@
 //! Lock-free storage engine using skiplist for O(log n) operations
 //! Optimized for high-throughput concurrent access
+//! Features: In-memory caching + disk-backed storage via B-Tree
 
 use crate::error::{Error, Result};
+use crate::storage_engine::btree::BTreeIndex;
+use crate::storage_engine::buffer_pool::BufferPool;
 use crossbeam_skiplist::SkipMap;
 use rkyv::{Archive, Deserialize, Serialize};
+use std::path::Path;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-/// Storage entry with metadata
+/// Storage entry with metadata and MVCC support
 #[derive(Archive, Deserialize, Serialize, Debug, Clone)]
 #[archive(compare(PartialEq), check_bytes)]
 pub struct StorageEntry {
@@ -16,26 +20,34 @@ pub struct StorageEntry {
     pub timestamp: u64,
     pub version: u64,
     pub ttl: u64, // 0 means no expiration
+    pub created_at: u64,  // MVCC: creation timestamp
+    pub deleted_at: Option<u64>,  // MVCC: deletion timestamp (soft delete)
 }
 
 impl StorageEntry {
     pub fn new(key: String, value: Vec<u8>) -> Self {
+        let now = current_timestamp();
         Self {
             key,
             value,
-            timestamp: current_timestamp(),
+            timestamp: now,
             version: 1,
             ttl: 0,
+            created_at: now,
+            deleted_at: None,
         }
     }
 
     pub fn with_ttl(key: String, value: Vec<u8>, ttl: u64) -> Self {
+        let now = current_timestamp();
         Self {
             key,
             value,
-            timestamp: current_timestamp(),
+            timestamp: now,
             version: 1,
             ttl,
+            created_at: now,
+            deleted_at: None,
         }
     }
 
@@ -46,12 +58,37 @@ impl StorageEntry {
         let now = current_timestamp();
         now > self.timestamp + self.ttl
     }
+    
+    /// MVCC: Check if entry is visible to a given snapshot timestamp
+    pub fn visible_to(&self, snapshot_ts: u64) -> bool {
+        // Entry must be created before snapshot
+        if self.created_at > snapshot_ts {
+            return false;
+        }
+        
+        // Entry must not be deleted, or deleted after snapshot
+        if let Some(deleted) = self.deleted_at {
+            if deleted <= snapshot_ts {
+                return false;
+            }
+        }
+        
+        true
+    }
+    
+    /// MVCC: Mark entry as deleted (soft delete)
+    pub fn mark_deleted(&mut self, delete_ts: u64) {
+        self.deleted_at = Some(delete_ts);
+    }
 }
 
-/// Lock-free storage engine
+/// Lock-free storage engine with optional disk-backed storage
 pub struct LockFreeStorage {
     data: Arc<SkipMap<String, Arc<StorageEntry>>>,
     stats: Arc<StorageStats>,
+    // Optional disk-backed storage
+    disk_index: Option<BTreeIndex>,
+    buffer_pool: Option<BufferPool>,
 }
 
 /// Storage statistics (lock-free counters)
@@ -97,10 +134,28 @@ impl StorageStats {
 }
 
 impl LockFreeStorage {
+    /// Create new in-memory only storage
     pub fn new(_capacity: usize) -> Result<Self> {
         Ok(Self {
             data: Arc::new(SkipMap::new()),
             stats: Arc::new(StorageStats::new()),
+            disk_index: None,
+            buffer_pool: None,
+        })
+    }
+    
+    /// Create storage with disk-backed B-Tree index
+    pub fn with_disk_storage<P: AsRef<Path>>(capacity: usize, disk_path: P, buffer_pool_size: usize) -> Result<Self> {
+        let disk_index = BTreeIndex::new(disk_path)
+            .map_err(|e| Error::StorageError(format!("Failed to create disk index: {:?}", e)))?;
+        
+        let buffer_pool = BufferPool::new(buffer_pool_size);
+        
+        Ok(Self {
+            data: Arc::new(SkipMap::new()),
+            stats: Arc::new(StorageStats::new()),
+            disk_index: Some(disk_index),
+            buffer_pool: Some(buffer_pool),
         })
     }
 
@@ -117,10 +172,18 @@ impl LockFreeStorage {
         self.put_string(key, value)
     }
 
-    /// Put a key-value pair with String key
+    /// Put a key-value pair with String key (writes to memory and optionally disk)
     pub fn put_string(&self, key: String, value: Vec<u8>) -> Result<()> {
-        let entry = Arc::new(StorageEntry::new(key.clone(), value));
-        self.data.insert(key, entry);
+        // Write to memory
+        let entry = Arc::new(StorageEntry::new(key.clone(), value.clone()));
+        self.data.insert(key.clone(), entry);
+        
+        // Write to disk if enabled
+        if let Some(ref disk_index) = self.disk_index {
+            disk_index.insert(key.as_bytes(), &value)
+                .map_err(|e| Error::StorageError(format!("Disk write error: {:?}", e)))?;
+        }
+        
         self.stats.writes.fetch_add(1, atomic::Ordering::Relaxed);
         Ok(())
     }
@@ -139,10 +202,11 @@ impl LockFreeStorage {
         self.get_string(&key)
     }
 
-    /// Get a value by string key
+    /// Get a value by string key (with disk fallback)
     pub fn get_string(&self, key: &str) -> Result<Vec<u8>> {
         self.stats.reads.fetch_add(1, atomic::Ordering::Relaxed);
 
+        // Try memory first
         match self.data.get(key) {
             Some(entry) => {
                 let entry = entry.value();
@@ -156,9 +220,28 @@ impl LockFreeStorage {
                 }
 
                 self.stats.hits.fetch_add(1, atomic::Ordering::Relaxed);
-                Ok(entry.value.clone())
+                return Ok(entry.value.clone());
             }
             None => {
+                // Memory miss - try disk if available
+                if let Some(ref disk_index) = self.disk_index {
+                    match disk_index.get(key.as_bytes()) {
+                        Ok(Some(value)) => {
+                            self.stats.hits.fetch_add(1, atomic::Ordering::Relaxed);
+                            
+                            // Promote to memory cache
+                            let entry = Arc::new(StorageEntry::new(key.to_string(), value.clone()));
+                            self.data.insert(key.to_string(), entry);
+                            
+                            return Ok(value);
+                        }
+                        Ok(None) => {},
+                        Err(e) => {
+                            return Err(Error::StorageError(format!("Disk read error: {:?}", e)));
+                        }
+                    }
+                }
+                
                 self.stats.misses.fetch_add(1, atomic::Ordering::Relaxed);
                 Err(Error::KeyNotFound(key.to_string()))
             }
@@ -171,10 +254,19 @@ impl LockFreeStorage {
         self.delete_string(&key)
     }
 
-    /// Delete a key by string
+    /// Delete a key by string (from memory and disk)
     pub fn delete_string(&self, key: &str) -> Result<()> {
         self.stats.deletes.fetch_add(1, atomic::Ordering::Relaxed);
+        
+        // Remove from memory
         self.data.remove(key);
+        
+        // Remove from disk if enabled
+        if let Some(ref disk_index) = self.disk_index {
+            disk_index.delete(key.as_bytes())
+                .map_err(|e| Error::StorageError(format!("Disk delete error: {:?}", e)))?;
+        }
+        
         Ok(())
     }
 
@@ -299,6 +391,8 @@ impl Clone for LockFreeStorage {
         Self {
             data: Arc::clone(&self.data),
             stats: Arc::clone(&self.stats),
+            disk_index: self.disk_index.clone(),
+            buffer_pool: self.buffer_pool.clone(),
         }
     }
 }

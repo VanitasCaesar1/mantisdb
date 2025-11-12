@@ -7,6 +7,39 @@ use parking_lot::RwLock;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
+use tokio::sync::broadcast;
+
+/// Cache write policy
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CachePolicy {
+    /// Write to cache only, no backend sync
+    WriteOnly,
+    /// Write to cache and storage atomically (slower, safer)
+    WriteThrough,
+    /// Write to cache immediately, async flush to storage (faster, risk of loss)
+    WriteBack,
+    /// Cache is read-only, updates bypass cache
+    ReadThrough,
+}
+
+impl Default for CachePolicy {
+    fn default() -> Self {
+        CachePolicy::WriteThrough
+    }
+}
+
+/// Cache invalidation event
+#[derive(Debug, Clone)]
+pub enum InvalidationEvent {
+    /// Invalidate a single key
+    Key(String),
+    /// Invalidate all keys with prefix
+    Prefix(String),
+    /// Invalidate all keys
+    All,
+    /// Invalidate based on dependency
+    Dependency(String),
+}
 
 /// Cache entry with LRU metadata
 #[derive(Clone)]
@@ -53,6 +86,10 @@ pub struct LockFreeCache {
     max_size: usize,
     current_size: Arc<AtomicUsize>,
     stats: Arc<CacheStats>,
+    policy: CachePolicy,
+    invalidation_tx: broadcast::Sender<InvalidationEvent>,
+    // Track key dependencies for invalidation
+    dependencies: Arc<RwLock<AHashMap<String, Vec<String>>>>,
 }
 
 /// Cache statistics
@@ -97,12 +134,81 @@ impl CacheStats {
 
 impl LockFreeCache {
     pub fn new(max_size: usize) -> Self {
+        Self::with_policy(max_size, CachePolicy::default())
+    }
+    
+    pub fn with_policy(max_size: usize, policy: CachePolicy) -> Self {
+        let (tx, _) = broadcast::channel(1024);
         Self {
             entries: Arc::new(RwLock::new(AHashMap::with_capacity(1024))),
             max_size,
             current_size: Arc::new(AtomicUsize::new(0)),
             stats: Arc::new(CacheStats::new()),
+            policy,
+            invalidation_tx: tx,
+            dependencies: Arc::new(RwLock::new(AHashMap::new())),
         }
+    }
+    
+    /// Subscribe to invalidation events
+    pub fn subscribe_invalidations(&self) -> broadcast::Receiver<InvalidationEvent> {
+        self.invalidation_tx.subscribe()
+    }
+    
+    /// Add dependency tracking (when key A changes, invalidate key B)
+    pub fn add_dependency(&self, source_key: String, dependent_key: String) {
+        let mut deps = self.dependencies.write();
+        deps.entry(source_key)
+            .or_insert_with(Vec::new)
+            .push(dependent_key);
+    }
+    
+    /// Invalidate cache entries based on event
+    pub fn invalidate(&self, event: InvalidationEvent) {
+        match &event {
+            InvalidationEvent::Key(key) => {
+                self.delete(key);
+                // Invalidate dependents
+                if let Some(dependents) = self.dependencies.read().get(key) {
+                    for dep in dependents {
+                        self.delete(dep);
+                    }
+                }
+            }
+            InvalidationEvent::Prefix(prefix) => {
+                let mut entries = self.entries.write();
+                let keys_to_remove: Vec<String> = entries
+                    .keys()
+                    .filter(|k| k.starts_with(prefix))
+                    .cloned()
+                    .collect();
+                for key in keys_to_remove {
+                    if let Some(entry) = entries.remove(&key) {
+                        self.current_size.fetch_sub(entry.size, Ordering::Relaxed);
+                    }
+                }
+            }
+            InvalidationEvent::All => {
+                self.clear();
+            }
+            InvalidationEvent::Dependency(dep_key) => {
+                // Find all keys that depend on this
+                let deps = self.dependencies.read();
+                for (source, dependents) in deps.iter() {
+                    if dependents.contains(dep_key) {
+                        self.delete(source);
+                    }
+                }
+            }
+        }
+        
+        // Broadcast event
+        let _ = self.invalidation_tx.send(event);
+    }
+    
+    /// Get cache policy
+    pub fn policy(&self) -> CachePolicy {
+        self.policy
     }
 
     /// Get value from cache (lock-free read path)
@@ -264,6 +370,9 @@ impl Clone for LockFreeCache {
             max_size: self.max_size,
             current_size: Arc::clone(&self.current_size),
             stats: Arc::clone(&self.stats),
+            policy: self.policy,
+            invalidation_tx: self.invalidation_tx.clone(),
+            dependencies: Arc::clone(&self.dependencies),
         }
     }
 }

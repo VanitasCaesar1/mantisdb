@@ -1,7 +1,11 @@
-//! High-performance connection pooling for MantisDB
+//! High-performance connection pooling for MantisDB.
 //!
-//! This module provides a lock-free, high-performance connection pool
-//! similar to PgBouncer, optimized for thousands of concurrent connections.
+//! This is a PgBouncer-style connection pool built on lock-free data structures.
+//! We use crossbeam's ArrayQueue (lock-free) for the idle pool and tokio's
+//! Semaphore for backpressure. The combination gives us:
+//! - Zero contention on connection checkout/return (lock-free queue)
+//! - Fair backpressure when pool is exhausted (semaphore)
+//! - Thousands of concurrent waiters without spinlock overhead
 
 use crate::storage::LockFreeStorage;
 use crate::error::{Error, Result};
@@ -35,8 +39,12 @@ impl Default for PoolConfig {
         Self {
             min_connections: 10,
             max_connections: 1000,
+            // 5 min idle timeout prevents connection buildup during traffic spikes.
             max_idle_time: Duration::from_secs(300),
+            // 10s connection timeout is aggressive - fail fast rather than queue up.
             connection_timeout: Duration::from_secs(10),
+            // 1hr max lifetime recycles connections periodically to avoid leaks
+            // from slow resource leaks in the storage layer.
             max_lifetime: Duration::from_secs(3600),
             health_check_interval: Duration::from_secs(30),
             recycle_connections: true,
@@ -59,16 +67,19 @@ impl PooledConnection {
         &self.storage
     }
 
-    /// Check if connection is still valid
+    /// Check if connection is still valid.
+    /// We check both age and health - age check is cheap, health check is expensive.
+    /// Checking age first short-circuits most calls without hitting storage.
     pub fn is_valid(&self) -> bool {
         let now = Instant::now();
         let lifetime = now.duration_since(self.created_at);
         
+        // Age check first - O(1), no I/O
         if lifetime > self.pool.config.max_lifetime {
             return false;
         }
 
-        // Perform basic health check
+        // Health check hits storage - only do this if age is OK
         self.storage.health_check().is_ok()
     }
 
@@ -85,7 +96,9 @@ impl PooledConnection {
 
 impl Drop for PooledConnection {
     fn drop(&mut self) {
-        // Return connection to pool
+        // RAII connection return - Drop runs automatically when conn goes out of scope.
+        // We spawn a task (not blocking) to avoid holding up the dropping thread.
+        // Trade-off: slightly delayed return for non-blocking Drop.
         let pool = self.pool.clone();
         let storage = self.storage.clone();
         let id = self.id;
@@ -145,13 +158,16 @@ impl ConnectionPoolInner {
             id,
         };
 
-        // Try to return to idle pool
+        // Try to return to idle pool (lock-free push).
+        // If queue is full, we drop the connection - better to close excess
+        // connections than let them pile up and exhaust memory.
         if self.idle_connections.push(entry).is_err() {
-            // Pool is full, close connection
             self.connections_closed.fetch_add(1, Ordering::Relaxed);
         }
         
+        // Atomics for stats - Relaxed ordering is sufficient for metrics.
         self.active_count.fetch_sub(1, Ordering::Relaxed);
+        // Release permit to unblock waiters
         self.semaphore.add_permits(1);
     }
 }

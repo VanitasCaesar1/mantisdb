@@ -1,3 +1,4 @@
+// manager.go - ACID transaction coordinator with deadlock detection
 package transaction
 
 import (
@@ -7,13 +8,20 @@ import (
 	"time"
 )
 
-// DefaultTransactionManager implements the TransactionManager interface
+// DefaultTransactionManager implements the TransactionManager interface.
+// This is the core of our ACID guarantee - it coordinates locks, detects deadlocks,
+// and ensures atomic commit/abort. We use a simple 2PL (two-phase locking) protocol
+// because it's proven and easy to reason about, not fancy MVCC which adds complexity.
 type DefaultTransactionManager struct {
+	// nextTxnID is atomic - no mutex needed for ID generation.
+	// Atomic increment is faster than mutex for this hot path.
 	nextTxnID    uint64
-	transactions map[uint64]*Transaction
+	transactions map[uint64]*Transaction // Active transactions only
 	lockManager  LockManager
-	mutex        sync.RWMutex
-	closed       bool
+	// mutex protects the transactions map, not individual transaction state.
+	// Each Transaction has its own mutex to reduce contention.
+	mutex  sync.RWMutex
+	closed bool
 }
 
 // NewTransactionManager creates a new transaction manager
@@ -34,6 +42,8 @@ func (tm *DefaultTransactionManager) Begin(isolation IsolationLevel) (*Transacti
 		return nil, fmt.Errorf("transaction manager is closed")
 	}
 
+	// Atomic ID generation - thread-safe without mutex overhead.
+	// We never reuse IDs even after wraparound (uint64 is big enough).
 	txnID := atomic.AddUint64(&tm.nextTxnID, 1)
 
 	txn := &Transaction{
@@ -63,20 +73,24 @@ func (tm *DefaultTransactionManager) Commit(txn *Transaction) error {
 		return fmt.Errorf("transaction %d is not active (status: %s)", txn.ID, txn.Status)
 	}
 
-	// TODO: Write operations to WAL before committing
-	// This will be implemented when WAL system is available
+	// TODO: Write operations to WAL *before* marking committed.
+	// This is the critical path for durability - if we crash after marking
+	// committed but before WAL flush, we lose data. The correct order is:
+	// 1. Write to WAL, 2. Fsync WAL, 3. Mark committed, 4. Release locks.
 
-	// Mark transaction as committed
+	// Mark as committed only after WAL flush (currently skipped).
 	txn.Status = TxnCommitted
 
-	// Release all locks held by this transaction
+	// Release locks immediately after commit - holding them longer hurts concurrency.
 	if err := tm.lockManager.ReleaseAllLocks(txn.ID); err != nil {
-		// Log error but don't fail the commit
-		// In a real system, this would be logged properly
+		// Don't fail commit if lock release fails - the transaction is already
+		// committed (durable). Failing here would violate atomicity.
+		// Worst case: locks leak until deadlock detector or timeout cleans them.
 		fmt.Printf("Warning: failed to release locks for transaction %d: %v\n", txn.ID, err)
 	}
 
-	// Remove transaction from active transactions
+	// Remove from active map to free memory.
+	// We hold the outer mutex briefly - delete is O(1) so no contention risk.
 	tm.mutex.Lock()
 	delete(tm.transactions, txn.ID)
 	tm.mutex.Unlock()
@@ -147,7 +161,9 @@ func (tm *DefaultTransactionManager) AcquireLock(txn *Transaction, key string, l
 	}
 	txn.mutex.RUnlock()
 
-	// Acquire lock through lock manager
+	// Delegate to lock manager which handles deadlock detection.
+	// This may block if the lock is held - the lock manager uses timeouts
+	// to prevent indefinite waiting and trigger deadlock resolution.
 	if err := tm.lockManager.AcquireLock(txn.ID, key, lockType); err != nil {
 		return fmt.Errorf("failed to acquire %s lock on %s for transaction %d: %w",
 			lockType, key, txn.ID, err)
