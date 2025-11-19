@@ -1,3 +1,9 @@
+/*
+ * Common
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
 // Package errors provides common error handling utilities
 package errors
 

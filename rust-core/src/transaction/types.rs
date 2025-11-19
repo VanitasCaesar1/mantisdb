@@ -1,3 +1,8 @@
+//! Types
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // Transaction System Types
 use serde::{Deserialize, Serialize};
 use std::fmt;

@@ -1,3 +1,15 @@
+/*
+ * Connection Pool - Rust FFI wrapper
+ *
+ * Go wrapper around Rust connection pool implementation.
+ * We use Rust for the pool because:
+ * 1. Lock-free data structures (faster than Go's mutex-based channels)
+ * 2. Better memory control (no GC pauses)
+ * 3. Proven performance in production databases
+ *
+ * The FFI overhead is negligible compared to network I/O.
+ * CGO calls are ~50ns, network round-trip is ~1ms.
+ */
 package pool
 
 /*

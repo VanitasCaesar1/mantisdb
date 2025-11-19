@@ -1,3 +1,10 @@
+/**
+ * SettingsSection
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '../ui';
 import { SettingsIcon } from '../icons';

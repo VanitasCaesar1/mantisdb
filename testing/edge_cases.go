@@ -1,3 +1,14 @@
+/*
+ * Edge Case Testing - Boundary conditions and corner cases
+ *
+ * Tests the weird stuff that breaks in production:
+ * - Empty strings, null values, max integers
+ * - Unicode edge cases (emoji, RTL text, zero-width chars)
+ * - Concurrent access patterns
+ * - Resource exhaustion scenarios
+ *
+ * These tests are slow - run them before releases, not on every commit.
+ */
 package testing
 
 import (

@@ -1,3 +1,8 @@
+//! Optimizer
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // Query Optimizer - Cost-based optimization
 use super::ast::*;
 use crate::error::MantisError;

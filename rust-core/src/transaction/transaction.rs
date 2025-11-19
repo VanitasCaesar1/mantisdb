@@ -1,3 +1,8 @@
+//! Transaction
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // Transaction Implementation with MVCC
 use super::types::*;
 use crate::error::MantisError;

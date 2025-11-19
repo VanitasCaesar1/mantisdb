@@ -1,3 +1,8 @@
+//! Lock Manager
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // Lock Manager with Deadlock Detection
 use super::types::*;
 use crate::error::MantisError;

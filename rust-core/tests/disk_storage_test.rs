@@ -1,3 +1,8 @@
+//! Disk Storage Test
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // Integration tests for disk-backed storage engine
 use mantisdb::error::Result;
 use mantisdb::storage::LockFreeStorage;

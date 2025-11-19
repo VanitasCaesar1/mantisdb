@@ -1,3 +1,8 @@
+//! Isolation
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // Isolation Level Implementation
 use super::types::*;
 

@@ -1,3 +1,8 @@
+//! Page
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // Page Management
 pub const PAGE_SIZE: usize = 8192;
 

@@ -1,12 +1,25 @@
-// storage_interface.go - Core storage abstraction layer
+/*
+ * Storage Engine Interface
+ *
+ * This is the abstraction layer between the database and actual storage.
+ * Why an interface? Because we have multiple backends:
+ * - Pure Go (portable, slower)
+ * - CGO (faster, platform-specific)
+ * - Rust FFI (fastest, requires Rust toolchain)
+ *
+ * The interface lets us swap engines without touching application code.
+ * No fancy dependency injection framework bullshit - just a simple interface.
+ */
 package storage
 
 import "context"
 
-// StorageEngine defines the interface for storage operations.
-// We use an interface here (not concrete types) because we have multiple
-// implementations: pure Go, CGO-based, and Rust FFI. The interface lets
-// us swap engines at runtime without changing application code.
+/*
+ * StorageEngine - The main storage interface
+ *
+ * All methods take context for cancellation. If you don't need cancellation,
+ * just pass context.Background() and stop overthinking it.
+ */
 type StorageEngine interface {
 	// Init creates/opens the database at dataDir.
 	// Must be called before any other operations - we enforce this at

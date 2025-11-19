@@ -1,3 +1,10 @@
+/**
+ * ColumnarSection
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import { useState, useEffect } from 'react';
 import { Columns, Plus, Trash2, RefreshCw, Download, TrendingUp } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui';

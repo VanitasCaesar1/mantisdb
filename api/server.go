@@ -1,3 +1,9 @@
+/*
+ * Server
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
 // server.go - HTTP API server for MantisDB operations
 package api
 

@@ -1,3 +1,16 @@
+/*
+ * Transaction Types - Core transaction data structures
+ *
+ * Defines the fundamental types for ACID transactions:
+ * - Transaction: Represents an atomic unit of work
+ * - TxnStatus: Active, Committed, or Aborted
+ * - Operation: Individual read/write operations
+ * - Lock: Resources held by the transaction
+ *
+ * Each transaction has a unique ID and tracks all operations
+ * for rollback support. We use 2PL (two-phase locking) for
+ * isolation - locks are held until commit/abort.
+ */
 package transaction
 
 import (

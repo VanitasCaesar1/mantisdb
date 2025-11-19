@@ -1,3 +1,15 @@
+/**
+ * Type Definitions - Shared TypeScript types for the admin dashboard
+ *
+ * All types are exported from this central file to avoid circular
+ * dependencies and ensure consistency across components.
+ *
+ * We use interfaces (not types) for object shapes because interfaces
+ * can be extended and provide better error messages.
+ *
+ * All API response types match the backend JSON structure exactly.
+ */
+
 // Common types for the MantisDB Admin Dashboard
 
 export interface DatabaseConnection {

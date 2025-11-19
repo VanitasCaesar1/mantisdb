@@ -1,3 +1,18 @@
+/*
+ * Prometheus Metrics - Prometheus-compatible metrics exporter
+ *
+ * Exposes database metrics in Prometheus format for monitoring.
+ * Metrics include:
+ * - Query latency (histogram)
+ * - Throughput (gauge)
+ * - Error rates (counter)
+ * - Resource usage (CPU, memory, disk)
+ *
+ * We use atomic operations for counters (not mutexes) because
+ * metrics are updated in the hot path. Atomic ops are 10x faster.
+ *
+ * Metrics endpoint: /metrics (standard Prometheus scrape target)
+ */
 package metrics
 
 import (

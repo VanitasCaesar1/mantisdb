@@ -1,4 +1,14 @@
-// parser.go - SQL parser with custom tokenizer
+/*
+ * SQL Parser - Because we're not using a library
+ *
+ * Why roll our own parser? Three reasons:
+ * 1. We only support a subset of SQL, full parsers are bloated overkill
+ * 2. Custom parser = better error messages for our specific use case
+ * 3. Zero dependencies = faster builds, smaller binaries, less bullshit
+ *
+ * This is a single-pass tokenizer + recursive descent parser.
+ * No fancy AST, no visitor pattern crap. Just tokens and simple parsing.
+ */
 package query
 
 import (
@@ -45,11 +55,13 @@ type OrderByClause struct {
 	Desc  bool
 }
 
-// Parser handles query parsing.
-// We implement our own parser (not a library) because:
-// 1. We only support a subset of SQL, so full SQL parsers are overkill
-// 2. Custom parser gives us control over error messages
-// 3. Zero dependencies = faster builds and smaller binaries
+/*
+ * Parser - The main parsing state machine
+ *
+ * Just a token stream and a position. That's it.
+ * No complex state, no backtracking, no lookahead beyond one token.
+ * Keep it simple, stupid.
+ */
 type Parser struct {
 	tokens []Token
 	pos    int // Current position in token stream
@@ -119,15 +131,25 @@ func (p *Parser) Parse(queryStr string) (*Query, error) {
 	}
 }
 
-// tokenize breaks the query string into tokens.
-// Single-pass tokenization - we don't build an AST, just token stream.
-// This is faster and simpler than multi-pass parsing for our SQL subset.
+/*
+ * tokenize - Break query string into tokens
+ *
+ * Single-pass, character-by-character scan. No regex bullshit.
+ * Regex tokenizers are slow and a pain to debug with SQL's quoting rules.
+ *
+ * We handle:
+ * - String literals (single and double quotes)
+ * - Numbers (integers and decimals)
+ * - Operators (=, <, >, !=, etc.)
+ * - Identifiers and keywords
+ * - Punctuation
+ *
+ * No escape sequences yet - strings are literal. Add it if you need it.
+ */
 func (p *Parser) tokenize(queryStr string) ([]Token, error) {
 	var tokens []Token
 	queryStr = strings.TrimSpace(queryStr)
 
-	// Manual character-by-character scan. A regex-based tokenizer would be
-	// slower and harder to debug for SQL's complex quoting rules.
 	i := 0
 	for i < len(queryStr) {
 		// Skip whitespace

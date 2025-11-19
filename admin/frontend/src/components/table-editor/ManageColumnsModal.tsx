@@ -1,3 +1,10 @@
+/**
+ * ManageColumnsModal
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import { useEffect, useState } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { apiClient } from '../../api/client';

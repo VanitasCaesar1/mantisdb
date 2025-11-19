@@ -1,3 +1,15 @@
+/*
+ * Columnar Data Model - Column-oriented storage
+ *
+ * Stores data in columns (not rows) for analytical workloads.
+ * Why columnar?
+ * - Better compression (similar values together)
+ * - Faster aggregations (read only needed columns)
+ * - Cache-friendly for OLAP queries
+ *
+ * Trade-off: Slower for transactional workloads that need full rows.
+ * Use key-value or document store for OLTP instead.
+ */
 package models
 
 import (

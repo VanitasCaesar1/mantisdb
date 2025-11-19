@@ -1,3 +1,15 @@
+/*
+ * Key-Value Model - Redis-like key-value storage
+ *
+ * Simple key-value pairs with optional TTL (time-to-live).
+ * Values are stored as byte arrays - no type enforcement.
+ *
+ * TTL is implemented with lazy deletion:
+ * - Check expiration on read (cheap)
+ * - Background cleanup every minute (removes expired keys)
+ *
+ * This is faster than active expiration (checking every key periodically).
+ */
 package models
 
 import (

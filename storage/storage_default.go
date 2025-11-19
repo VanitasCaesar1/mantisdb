@@ -1,3 +1,9 @@
+/*
+ * Storage Default
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
 //go:build !rust
 // +build !rust
 

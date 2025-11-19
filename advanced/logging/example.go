@@ -1,3 +1,10 @@
+/*
+ * Logging Example
+ *
+ * TODO: Add description of what this component does and why it exists.
+ * TODO: Document any important design decisions or trade-offs.
+ * TODO: Explain performance considerations if any.
+ */
 package logging
 
 import (

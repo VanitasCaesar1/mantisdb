@@ -1,3 +1,16 @@
+/*
+ * Storage Interfaces - Public API for storage engines
+ *
+ * Defines the contract that all storage engines must implement.
+ * This abstraction lets us swap engines (Pure Go, Rust, RocksDB)
+ * without changing application code.
+ *
+ * The interface is intentionally minimal - just Get/Put/Delete.
+ * Complex operations (transactions, queries) are built on top
+ * of these primitives in higher layers.
+ *
+ * All methods take context for cancellation and timeouts.
+ */
 // Package storage provides public interfaces for MantisDB storage components
 package storage
 

@@ -1,3 +1,16 @@
+/*
+ * WAL Entry - Write-Ahead Log entry format
+ *
+ * Each WAL entry is a serialized operation with:
+ * - LSN (Log Sequence Number) - monotonically increasing
+ * - Transaction ID
+ * - Operation type (insert/update/delete/commit/abort)
+ * - Data (key, value, old value for undo)
+ * - CRC32 checksum for corruption detection
+ *
+ * Entries are written sequentially to disk for fast appends.
+ * We use binary encoding (not JSON) for speed and compactness.
+ */
 package wal
 
 import (

@@ -1,4 +1,17 @@
-// cache_manager.go - Intelligent cache with dependency tracking and TTL
+/*
+ * Cache Manager - Because databases without caching are slow as hell
+ *
+ * This isn't your typical LRU cache. We have:
+ * - Dependency tracking (invalidate derived data automatically)
+ * - TTL support (because some data expires)
+ * - Multiple eviction policies (LRU, LFU, pick your poison)
+ *
+ * The dependency tracking is the interesting part. When you cache a query
+ * result that depends on tables A and B, we track those dependencies.
+ * When A or B change, we automatically invalidate the cached result.
+ *
+ * This prevents the classic "stale cache" problem without manual invalidation.
+ */
 package cache
 
 import (
@@ -7,10 +20,12 @@ import (
 	"time"
 )
 
-// CacheManager handles intelligent caching with dependency tracking.
-// Dependency tracking lets us invalidate derived data when source data changes.
-// For example, if we cache a query result that depends on tables A and B,
-// we automatically invalidate the result when A or B are modified.
+/*
+ * CacheManager - The main cache coordinator
+ *
+ * Uses RWMutex for thread safety. Reads are concurrent, writes are exclusive.
+ * Background goroutine handles TTL cleanup so we don't block the hot path.
+ */
 type CacheManager struct {
 	entries    map[string]*CacheEntry
 	mutex      sync.RWMutex

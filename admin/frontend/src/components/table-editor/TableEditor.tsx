@@ -1,3 +1,10 @@
+/**
+ * TableEditor
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import { useState, useEffect } from 'react';
 import { Table2, Plus, Trash2, RefreshCw, Search, ChevronLeft, ChevronRight, Save, X, Download, Database } from 'lucide-react';
 import { apiClient } from '../../api/client';

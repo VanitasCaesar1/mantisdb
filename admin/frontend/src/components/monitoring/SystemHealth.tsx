@@ -1,3 +1,10 @@
+/**
+ * SystemHealth
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import React from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Badge } from '../ui';
 import { formatRelativeTime } from '../../utils';

@@ -1,3 +1,10 @@
+/**
+ * LoginPage
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import { useEffect, useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input } from '../ui';

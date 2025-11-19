@@ -1,3 +1,17 @@
+/*
+ * Durability Manager - Ensures data survives crashes
+ *
+ * Guarantees writes are durable (survive power loss/crashes).
+ * We use fsync() to force data to disk before acknowledging writes.
+ *
+ * Three modes:
+ * - Sync: fsync every write (slowest, safest)
+ * - Async: fsync periodically (faster, small data loss window)
+ * - Batch: fsync after N writes (balanced)
+ *
+ * Default is async with 1-second sync interval - acceptable for
+ * most applications. Financial systems should use sync mode.
+ */
 package durability
 
 import (

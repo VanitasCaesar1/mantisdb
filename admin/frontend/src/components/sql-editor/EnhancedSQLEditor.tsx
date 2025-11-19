@@ -1,3 +1,10 @@
+/**
+ * EnhancedSQLEditor
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
 import Editor from '@monaco-editor/react';
 import { Card, CardHeader, CardTitle, CardContent, Button } from '../ui';

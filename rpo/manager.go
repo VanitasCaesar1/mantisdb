@@ -1,3 +1,14 @@
+/*
+ * RPO Manager - Recovery Point Objective enforcement
+ *
+ * Ensures we don't lose more than X seconds of data on crash.
+ * RPO is enforced by controlling WAL sync frequency:
+ * - Lower RPO = more frequent syncs = slower writes
+ * - Higher RPO = less frequent syncs = faster writes
+ *
+ * Default RPO is 1 second (acceptable for most applications).
+ * Financial systems might need 0 (sync every write).
+ */
 package rpo
 
 import (

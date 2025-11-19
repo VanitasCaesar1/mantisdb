@@ -1,3 +1,10 @@
+/**
+ * BackupSchedule
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, Badge, Modal } from '../ui';
 import { PlusIcon, RefreshIcon } from '../icons';

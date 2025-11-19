@@ -1,3 +1,16 @@
+/**
+ * API Client - HTTP client for MantisDB REST API
+ *
+ * Provides typed methods for all API endpoints.
+ * Features:
+ * - Automatic retry with exponential backoff
+ * - Request/response interceptors
+ * - Type-safe responses (TypeScript)
+ * - Error handling with user-friendly messages
+ *
+ * Uses fetch API (not axios) to reduce bundle size.
+ */
+
 import type { 
   SystemStats, 
   TableInfo, 

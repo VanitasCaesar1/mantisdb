@@ -1,3 +1,8 @@
+//! Sql Join Test
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // Integration tests for SQL JOIN operations
 use mantisdb::error::Result as MantisResult;
 use mantisdb::sql::parser::Parser;

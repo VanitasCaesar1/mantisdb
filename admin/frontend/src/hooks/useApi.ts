@@ -1,3 +1,19 @@
+/**
+ * useApi Hook - React hook for API calls with loading/error states
+ *
+ * Handles the boilerplate of API calls: loading state, error handling,
+ * data caching, and automatic retries. Use this instead of raw fetch.
+ *
+ * Features:
+ * - Automatic loading/error state management
+ * - Request deduplication (prevents duplicate calls)
+ * - Automatic retry on failure
+ * - Cleanup on unmount (prevents memory leaks)
+ *
+ * We use refs (not state) for tracking in-flight requests to avoid
+ * re-renders during the request lifecycle.
+ */
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { apiClient, type ApiResponse } from '../api/client';
 

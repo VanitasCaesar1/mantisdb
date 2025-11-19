@@ -1,3 +1,8 @@
+//! Manager
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // WAL Manager - Write-Ahead Logging
 use super::entry::*;
 use crate::error::MantisError;

@@ -1,3 +1,9 @@
+/*
+ * Storage Provider
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
 // Package providers contains service providers for dependency injection
 package providers
 

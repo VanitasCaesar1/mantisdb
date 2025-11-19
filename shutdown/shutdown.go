@@ -1,3 +1,17 @@
+/*
+ * Graceful Shutdown - Clean shutdown with timeout
+ *
+ * Handles SIGTERM/SIGINT and shuts down cleanly:
+ * 1. Stop accepting new requests
+ * 2. Wait for in-flight requests to complete
+ * 3. Flush WAL and close files
+ * 4. Release locks
+ *
+ * We give components 30 seconds to shut down gracefully.
+ * After that, we force-kill to prevent hanging forever.
+ *
+ * This prevents data corruption from abrupt termination.
+ */
 package shutdown
 
 import (

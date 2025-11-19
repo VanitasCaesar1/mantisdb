@@ -1,3 +1,16 @@
+/*
+ * Pure Go Storage Engine
+ *
+ * This is the fallback implementation when CGO/Rust aren't available.
+ * It's just a map with a mutex. Simple, portable, and good enough for
+ * development and small deployments.
+ *
+ * For production with high load, use the Rust engine. This is slower
+ * because Go's map isn't optimized for database workloads, and the
+ * RWMutex becomes a bottleneck under heavy concurrent writes.
+ *
+ * But hey, it works everywhere and has zero dependencies.
+ */
 package storage
 
 import (
@@ -6,7 +19,12 @@ import (
 	"sync"
 )
 
-// PureGoStorageEngine implements StorageEngine in pure Go
+/*
+ * PureGoStorageEngine - In-memory map-based storage
+ *
+ * Thread-safe via RWMutex. Read-heavy workloads scale well,
+ * write-heavy workloads... not so much.
+ */
 type PureGoStorageEngine struct {
 	data   map[string]string
 	mutex  sync.RWMutex

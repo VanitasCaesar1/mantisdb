@@ -1,3 +1,8 @@
+//! Comprehensive Bench
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use mantisdb::cache::LockFreeCache;
 use mantisdb::columnar_engine::ColumnStore;

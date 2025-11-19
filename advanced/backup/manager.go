@@ -1,3 +1,15 @@
+/*
+ * Backup Manager - Consistent snapshots via WAL checkpoints
+ *
+ * Creates point-in-time snapshots by coordinating with the WAL system.
+ * We use WAL checkpoints (not filesystem snapshots) because:
+ * 1. Portable across all filesystems
+ * 2. Guarantees consistency without quiescing writes
+ * 3. Works with our existing WAL infrastructure
+ *
+ * The snapshot process: checkpoint WAL -> copy data files -> record LSN.
+ * This ensures we can restore to exact transaction boundaries.
+ */
 package backup
 
 import (

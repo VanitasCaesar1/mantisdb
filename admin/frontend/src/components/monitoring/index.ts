@@ -1,3 +1,10 @@
+/**
+ * Index
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 // Monitoring Components barrel export
 export { default as MetricsDashboard } from './MetricsDashboard';
 export { default as LogViewer } from './LogViewer';

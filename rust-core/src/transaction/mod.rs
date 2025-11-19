@@ -1,3 +1,8 @@
+//! Mod
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // Transaction System Module
 // MVCC, lock management, deadlock detection, isolation levels
 

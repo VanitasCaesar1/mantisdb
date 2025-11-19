@@ -1,3 +1,8 @@
+//! Recovery
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // WAL Recovery System
 use super::entry::*;
 use super::manager::WalManager;

@@ -1,3 +1,15 @@
+//! Error Handling - Structured errors with context
+//!
+//! We use thiserror (not anyhow) because we want typed errors, not
+//! dynamic error chains. Typed errors let callers handle specific
+//! cases without string matching.
+//!
+//! Error codes are numeric for easy logging/monitoring. Each error
+//! includes context (what operation failed, why, how to fix).
+//!
+//! We don't use Result<T, Box<dyn Error>> because boxing adds overhead
+//! and loses type information. Our Error enum is small enough.
+
 use thiserror::Error;
 use std::collections::HashMap;
 use std::fmt;

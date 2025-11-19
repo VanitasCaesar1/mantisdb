@@ -1,3 +1,8 @@
+//! Parser
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // High-Performance SQL Parser
 use super::ast::*;
 use super::lexer::{Lexer, Token};

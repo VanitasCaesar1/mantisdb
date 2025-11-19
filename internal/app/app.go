@@ -1,3 +1,9 @@
+/*
+ * App
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
 // Package app provides application bootstrap and dependency injection setup
 package app
 

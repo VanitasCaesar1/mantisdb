@@ -1,3 +1,8 @@
+//! Kv Bench
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 use mantisdb_core::storage::LockFreeStorage;
 use rand::rngs::StdRng;

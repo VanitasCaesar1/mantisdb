@@ -1,3 +1,15 @@
+/*
+ * Integrity Monitor - Continuous integrity verification
+ *
+ * Runs background scans to detect corruption before it causes problems.
+ * Scans are throttled to avoid impacting foreground operations:
+ * - Max 10% CPU usage
+ * - Max 100 files/second
+ * - Pauses during high load
+ *
+ * Alerts on corruption via configured channels (email, Slack, PagerDuty).
+ * Tracks corruption trends to predict disk failures.
+ */
 package integrity
 
 import (

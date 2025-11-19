@@ -1,3 +1,17 @@
+/*
+ * Checksum Engine - Data integrity verification
+ *
+ * Detects data corruption using checksums. We support multiple algorithms:
+ * - CRC32: Fast, good enough for most cases (default)
+ * - MD5: Better collision resistance, slower
+ * - SHA256: Cryptographically secure, slowest
+ *
+ * CRC32 is the default because it's 10x faster than MD5 and corruption
+ * detection (not security) is our goal. Use SHA256 only if you need
+ * tamper-proof guarantees.
+ *
+ * Checksums are stored with data and verified on read.
+ */
 package integrity
 
 import (

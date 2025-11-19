@@ -1,3 +1,10 @@
+/**
+ * Layout
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import React, { useState } from 'react';
 import Sidebar, { SidebarItem } from './Sidebar';
 import Header, { HeaderProps } from './Header';

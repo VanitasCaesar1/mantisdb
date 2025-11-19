@@ -1,3 +1,9 @@
+/*
+ * Manager
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
 // manager.go - ACID transaction coordinator with deadlock detection
 package transaction
 

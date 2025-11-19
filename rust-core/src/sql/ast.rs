@@ -1,3 +1,8 @@
+//! Ast
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // Abstract Syntax Tree for SQL
 use super::types::SqlValue;
 

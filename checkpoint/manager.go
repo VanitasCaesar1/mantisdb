@@ -1,3 +1,18 @@
+/*
+ * Checkpoint Manager - Point-in-time recovery markers
+ *
+ * Creates checkpoints that mark consistent database states.
+ * Checkpoints let us truncate old WAL files safely - we only need
+ * WAL entries after the last checkpoint for recovery.
+ *
+ * Checkpoint process:
+ * 1. Flush all dirty pages to disk
+ * 2. Record current LSN
+ * 3. Write checkpoint metadata
+ * 4. Fsync everything
+ *
+ * We use CRC32 checksums to detect corrupted checkpoints.
+ */
 package checkpoint
 
 import (

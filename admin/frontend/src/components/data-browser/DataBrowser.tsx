@@ -1,3 +1,10 @@
+/**
+ * DataBrowser
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import { useState, useEffect } from 'react';
 import { Database, Table2, Plus, Trash2, Edit, Search, ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
 import { apiClient } from '../../api/client';

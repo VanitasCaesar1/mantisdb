@@ -1,3 +1,16 @@
+/*
+ * Memory Monitor - Tracks memory usage and triggers alerts
+ *
+ * Monitors Go runtime memory stats and system memory usage.
+ * Triggers callbacks when thresholds are exceeded:
+ * - Warning at 70% (start cleanup)
+ * - Critical at 90% (aggressive cleanup, reject new requests)
+ *
+ * We poll every second (configurable) using runtime.ReadMemStats.
+ * This is cheap - ReadMemStats is optimized and doesn't stop the world.
+ *
+ * Helps prevent OOM kills by taking action before memory is exhausted.
+ */
 package memory
 
 import (

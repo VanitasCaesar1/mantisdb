@@ -1,3 +1,18 @@
+/*
+ * Integrity System - Detects and prevents data corruption
+ *
+ * Coordinates all integrity checks:
+ * - Checksum verification on reads
+ * - Background file scanning
+ * - Corruption detection and reporting
+ * - Automatic repair from WAL when possible
+ *
+ * We use CRC32 checksums by default (fast enough for hot path).
+ * Background scanner runs every hour to catch silent corruption.
+ *
+ * When corruption is detected, we log it, alert, and attempt
+ * recovery from WAL or backups.
+ */
 package integrity
 
 import (

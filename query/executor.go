@@ -1,3 +1,9 @@
+/*
+ * Executor
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
 // executor.go - Query execution engine with caching
 package query
 

@@ -1,3 +1,15 @@
+/*
+ * Logging Manager - Structured logging with search and filtering
+ *
+ * Provides structured JSON logging with efficient search capabilities.
+ * We use JSON (not plain text) because:
+ * 1. Easier to parse and search programmatically
+ * 2. Preserves data types (no string parsing needed)
+ * 3. Works well with log aggregation tools (ELK, Splunk, etc.)
+ *
+ * Logs are buffered and flushed periodically to reduce I/O overhead.
+ * In production, point this at a log aggregator, not local disk.
+ */
 package logging
 
 import (
@@ -15,7 +27,7 @@ import (
 )
 
 // LogFilter defines criteria for filtering log entries
-type LogFilter struct {
+type LogFilter struct{
 	Level       *LogLevel  `json:"level,omitempty"`
 	Component   string     `json:"component,omitempty"`
 	RequestID   string     `json:"request_id,omitempty"`

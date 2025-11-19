@@ -1,3 +1,15 @@
+/*
+ * MantisDB Go Client - Official Go SDK
+ *
+ * Provides a type-safe, idiomatic Go interface to MantisDB.
+ * Features:
+ * - Connection pooling (reuses HTTP connections)
+ * - Automatic retries with exponential backoff
+ * - Context support for cancellation and timeouts
+ * - Structured error handling
+ *
+ * Thread-safe - safe to use from multiple goroutines.
+ */
 package mantisdb
 
 import (

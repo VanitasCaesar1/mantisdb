@@ -1,3 +1,10 @@
+/**
+ * Index
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 export { default as Badge } from './Badge';
 export type { BadgeProps } from './Badge';
 

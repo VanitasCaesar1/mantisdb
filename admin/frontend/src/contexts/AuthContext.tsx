@@ -1,3 +1,10 @@
+/**
+ * AuthContext
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { buildApiUrl } from '../config/api';
 

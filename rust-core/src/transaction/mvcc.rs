@@ -1,3 +1,8 @@
+//! Mvcc
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // Multi-Version Concurrency Control (MVCC)
 use super::types::*;
 use std::collections::HashMap;

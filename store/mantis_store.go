@@ -1,3 +1,18 @@
+/*
+ * MantisStore - Unified multi-model data store
+ *
+ * This is the main entry point for all data operations.
+ * Provides a unified interface to:
+ * - Key-Value store (Redis-like)
+ * - Document store (MongoDB-like)
+ * - Columnar store (Cassandra-like)
+ * - SQL store (PostgreSQL-like)
+ *
+ * All models share the same storage engine and cache layer,
+ * so you can query across models efficiently.
+ *
+ * Thread-safe - handles concurrent access internally.
+ */
 package store
 
 import (

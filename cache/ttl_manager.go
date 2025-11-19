@@ -1,3 +1,17 @@
+/*
+ * TTL Manager - Time-based cache expiration
+ *
+ * Manages cache entry expiration using Go timers.
+ * Each entry gets its own timer that fires when TTL expires.
+ *
+ * We use timers (not polling) because:
+ * 1. More accurate - expires exactly when TTL is reached
+ * 2. Lower CPU - no need to scan all entries periodically
+ * 3. Scales better - O(1) per expiration, not O(n)
+ *
+ * Trade-off: Uses more memory (one timer per entry).
+ * For millions of entries, consider a timing wheel instead.
+ */
 package cache
 
 import (

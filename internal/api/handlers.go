@@ -1,3 +1,17 @@
+/*
+ * Internal API Handlers - HTTP request handlers for all data models
+ *
+ * Handles HTTP requests and routes them to the appropriate store.
+ * Each handler:
+ * 1. Validates input (fail fast on bad requests)
+ * 2. Calls the store layer
+ * 3. Formats response as JSON
+ * 4. Logs errors with request context
+ *
+ * We use standard library http (not a framework) for simplicity
+ * and to avoid dependency bloat. Performance is good enough -
+ * the database operations are the bottleneck, not HTTP parsing.
+ */
 // Package api provides internal API handler implementations
 package api
 

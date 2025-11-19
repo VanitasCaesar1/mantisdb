@@ -1,3 +1,10 @@
+/**
+ * SchemaVisualizerSection
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import { useState, useEffect } from 'react';
 import { Database, Table2, Search, Plus, Columns, Link } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui';

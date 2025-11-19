@@ -1,3 +1,15 @@
+/*
+ * Write Optimizer - Batching and buffering for write-heavy workloads
+ *
+ * Combines small writes into larger batches to reduce syscall overhead.
+ * We buffer writes in memory and flush when:
+ * 1. Buffer reaches size threshold (default 64KB)
+ * 2. Time threshold expires (default 100ms)
+ * 3. Explicit flush is requested
+ *
+ * This trades latency for throughput - writes aren't immediately durable.
+ * For durability-critical workloads, use sync mode instead.
+ */
 package advanced
 
 import (
@@ -10,7 +22,7 @@ import (
 )
 
 // WriteOptimizer provides high-performance write optimizations
-type WriteOptimizer struct {
+type WriteOptimizer struct{
 	config      *WriteOptimizerConfig
 	buffers     []*WriteBuffer
 	bufferIndex uint64

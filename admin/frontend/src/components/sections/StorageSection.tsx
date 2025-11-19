@@ -1,3 +1,10 @@
+/**
+ * StorageSection
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import { useEffect, useMemo, useState } from 'react';
 import { Folder, File, Upload, Download, Trash2, Search, Grid, List, FolderPlus, Info } from 'lucide-react';
 import { Card, CardContent } from '../ui';

@@ -1,3 +1,17 @@
+/*
+ * Error Handler - Centralized error handling with recovery strategies
+ *
+ * Handles errors consistently across the database:
+ * - I/O errors: Retry with exponential backoff
+ * - Corruption: Attempt recovery from WAL or backups
+ * - Resource exhaustion: Trigger cleanup and alert
+ *
+ * We categorize errors by severity (low/medium/high/critical) to
+ * determine the appropriate response. Critical errors trigger
+ * immediate shutdown to prevent data corruption.
+ *
+ * All errors are logged with context for debugging.
+ */
 package errors
 
 import (

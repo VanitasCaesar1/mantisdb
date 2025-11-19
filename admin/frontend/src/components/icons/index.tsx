@@ -1,3 +1,15 @@
+/**
+ * Icon Components - SVG icons for the admin UI
+ *
+ * Custom SVG icons (not an icon library) to keep bundle size small.
+ * Each icon is ~1KB, vs 50KB+ for icon libraries.
+ *
+ * Icons are inline SVG (not img tags) so they can be styled with CSS
+ * and don't require separate HTTP requests.
+ *
+ * All icons accept className prop for Tailwind styling.
+ */
+
 import React from 'react';
 
 export const DatabaseIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (

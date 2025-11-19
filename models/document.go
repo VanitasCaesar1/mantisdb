@@ -1,3 +1,13 @@
+/*
+ * Document Model - Schema-free document storage
+ *
+ * Documents are JSON objects with flexible schemas.
+ * We use map[string]interface{} (not structs) because documents
+ * don't have fixed schemas - each document can have different fields.
+ *
+ * Metadata tracks creation time, updates, and version for MVCC.
+ * Collections are logical groupings, like tables in SQL.
+ */
 package models
 
 import (

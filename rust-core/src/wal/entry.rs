@@ -1,3 +1,8 @@
+//! Entry
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // WAL Entry Types
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;

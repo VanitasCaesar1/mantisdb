@@ -1,3 +1,10 @@
+/**
+ * MonitoringSection
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import { Card, CardHeader, CardTitle, CardContent } from '../ui';
 import { useSystemStats, useRealTimeMetrics } from '../../hooks/useApi';
 

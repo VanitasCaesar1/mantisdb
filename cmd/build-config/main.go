@@ -1,3 +1,11 @@
+/*
+ * Build Configuration Tool
+ *
+ * Validates and manages build configuration files.
+ * Used by the build system to ensure consistent builds across environments.
+ *
+ * This is a build-time tool, not part of the runtime database.
+ */
 package main
 
 import (

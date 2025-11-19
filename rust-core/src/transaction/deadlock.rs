@@ -1,3 +1,8 @@
+//! Deadlock
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // Deadlock Detection
 use super::types::*;
 use std::collections::{HashMap, HashSet};

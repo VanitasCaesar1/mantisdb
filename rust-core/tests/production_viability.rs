@@ -1,3 +1,8 @@
+//! Production Viability
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 use axum::{http::Request, Router};
 use tower::ServiceExt; // for `oneshot`
 use mantisdb_core::{build_admin_router, AdminState};

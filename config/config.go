@@ -1,3 +1,17 @@
+/*
+ * Configuration Management - Environment-aware config with validation
+ *
+ * Loads config from multiple sources in priority order:
+ * 1. Environment variables (highest priority)
+ * 2. Config file (YAML)
+ * 3. Defaults (lowest priority)
+ *
+ * We use environment variables for production (12-factor app pattern)
+ * and config files for development. This makes deployment easier -
+ * no need to rebuild for different environments.
+ *
+ * All configs are validated on load to fail fast on misconfiguration.
+ */
 package config
 
 import (
@@ -9,7 +23,7 @@ import (
 )
 
 // Config holds the application configuration
-type Config struct {
+type Config struct{
 	Server   ServerConfig   `yaml:"server"`
 	Database DatabaseConfig `yaml:"database"`
 	Backup   BackupConfig   `yaml:"backup"`

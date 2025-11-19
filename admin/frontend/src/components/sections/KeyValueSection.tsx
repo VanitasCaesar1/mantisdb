@@ -1,3 +1,10 @@
+/**
+ * KeyValueSection
+ *
+ * Part of MantisDB - High-performance multi-model database.
+ * See CONTRIBUTING.md for code standards and comment guidelines.
+ */
+
 import { useState, useEffect } from 'react';
 import { Key, Plus, Trash2, RefreshCw, Search, Edit2, Copy, Check, Clock } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '../ui';

@@ -1,3 +1,17 @@
+/*
+ * Transaction Isolation - MVCC snapshot isolation
+ *
+ * Implements snapshot isolation using Multi-Version Concurrency Control.
+ * Each transaction sees a consistent snapshot of the database as of its
+ * start time - no dirty reads, no non-repeatable reads.
+ *
+ * We use MVCC (not 2PL) for reads because:
+ * - Readers don't block writers
+ * - Writers don't block readers
+ * - Better concurrency for read-heavy workloads
+ *
+ * Trade-off: More memory (keeping old versions) for better performance.
+ */
 package transaction
 
 import (

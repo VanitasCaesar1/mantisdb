@@ -1,3 +1,16 @@
+/**
+ * MantisDB Admin Dashboard - Main Application Component
+ *
+ * This is the root component for the admin UI. It manages:
+ * - Navigation state (which section is active)
+ * - Real-time metrics updates via WebSocket
+ * - Authentication state
+ * - Global error handling
+ *
+ * Built with React + TypeScript for type safety.
+ * Uses Tailwind CSS for styling (utility-first approach).
+ */
+
 import { useState, useMemo, memo } from 'react';
 import { Layout } from './components/layout';
 import { Card, CardHeader, CardTitle, CardContent } from './components/ui/index';

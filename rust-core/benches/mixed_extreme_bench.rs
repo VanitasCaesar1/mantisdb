@@ -1,3 +1,8 @@
+//! Mixed Extreme Bench
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 use criterion::{criterion_group, criterion_main, Criterion};
 use mantisdb_core::storage::LockFreeStorage;
 use rand::rngs::StdRng;

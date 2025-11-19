@@ -1,3 +1,14 @@
+/*
+ * Compression Engine - Multi-algorithm compression with automatic selection
+ *
+ * Supports Snappy, LZ4, and Zstandard. Why three algorithms?
+ * - Snappy: Fast compression, moderate ratio (default for hot data)
+ * - LZ4: Fastest decompression (for frequently accessed data)
+ * - Zstandard: Best ratio (for cold data, backups)
+ *
+ * The engine auto-selects based on data characteristics and access patterns.
+ * We benchmark on startup to pick the best algorithm for your CPU.
+ */
 package compression
 
 import (

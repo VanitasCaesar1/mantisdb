@@ -1,3 +1,18 @@
+/*
+ * Dependency Graph - Tracks cache entry dependencies for smart invalidation
+ *
+ * When you cache a query result that depends on tables A and B,
+ * we track those dependencies. When A or B change, we automatically
+ * invalidate the cached result.
+ *
+ * This prevents stale cache problems without manual invalidation.
+ * The graph is bidirectional:
+ * - dependencies: what this entry depends on
+ * - dependents: what depends on this entry
+ *
+ * We use maps (not a real graph library) because our dependency
+ * patterns are simple and maps are faster for our use case.
+ */
 package cache
 
 import (
@@ -5,7 +20,7 @@ import (
 )
 
 // DependencyGraph tracks dependencies between cache entries
-type DependencyGraph struct {
+type DependencyGraph struct{
 	// dependencies maps a key to its dependencies (what it depends on)
 	dependencies map[string][]string
 	// dependents maps a key to its dependents (what depends on it)

@@ -1,3 +1,8 @@
+//! Types
+//!
+//! Part of MantisDB - High-performance multi-model database.
+//! See CONTRIBUTING.md for code standards and comment guidelines.
+
 // Storage Engine Types
 use serde::{Deserialize, Serialize};
 

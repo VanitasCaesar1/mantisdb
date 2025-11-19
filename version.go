@@ -1,3 +1,9 @@
+/*
+ * Version information for MantisDB
+ *
+ * This is the kind of stuff that should be set at build time, not hardcoded.
+ * If you're seeing "dev" and "unknown" in production, someone screwed up the build.
+ */
 package main
 
 import (
@@ -6,12 +12,9 @@ import (
 )
 
 var (
-	// Version is set during build time
-	Version = "dev"
-	// BuildTime is set during build time
-	BuildTime = "unknown"
-	// GitCommit is set during build time
-	GitCommit = "unknown"
+	Version   = "dev"     // Set via -ldflags during build, or you're doing it wrong
+	BuildTime = "unknown" // Ditto
+	GitCommit = "unknown" // And this too
 )
 
 // VersionInfo contains version information

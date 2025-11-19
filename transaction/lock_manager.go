@@ -1,3 +1,17 @@
+/*
+ * Lock Manager - Deadlock-detecting lock manager
+ *
+ * Manages locks for transactions with automatic deadlock detection.
+ * Uses a wait-for graph to detect cycles (deadlocks) and aborts
+ * the youngest transaction to break the cycle.
+ *
+ * Lock types:
+ * - Shared (S): Multiple readers allowed
+ * - Exclusive (X): Single writer, no readers
+ *
+ * Locks are held until transaction commit/abort (2PL protocol).
+ * Timeout is 5 seconds - if you can't get a lock by then, abort.
+ */
 package transaction
 
 import (
