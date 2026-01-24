@@ -192,7 +192,6 @@ impl QueryExecutor {
         
         Ok(result)
     }
-}
 
     /// Evaluate join condition on a combined row
     fn evaluate_join_condition(

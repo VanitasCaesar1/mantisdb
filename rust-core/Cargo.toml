@@ -79,6 +79,11 @@ num_cpus = "1.16"
 rand = "0.8"
 base64 = "0.21"
 
+# CLI tools
+clap = { version = "4.4", features = ["derive", "env"] }
+colored = "2.1"
+reqwest = { version = "0.11", features = ["blocking", "json"] }
+
 # UUID generation
 uuid = { version = "1.6", features = ["v4", "serde"] }
 
@@ -134,3 +139,11 @@ path = "src/bin/admin-server.rs"
 [[bin]]
 name = "mantisdb-migrate"
 path = "src/bin/mantisdb-migrate.rs"
+
+[[bin]]
+name = "mantisdb-cli"
+path = "src/bin/mantisdb-cli.rs"
+
+[[bin]]
+name = "mantisdb-repl"
+path = "src/bin/mantisdb-repl.rs"

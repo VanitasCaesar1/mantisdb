@@ -112,12 +112,15 @@ impl CDCStream {
     pub fn capture(&self, stream_name: &str, mut event: ChangeEvent) -> Result<u64> {
         let mut inner = self.inner.write();
         
+        // Get global offset first
+        let offset = inner.global_offset;
+        inner.global_offset += 1;
+        
         let stream = inner.streams.get_mut(stream_name)
             .ok_or_else(|| Error::General(format!("Stream '{}' not found", stream_name)))?;
         
         // Assign global offset
-        event.offset = inner.global_offset;
-        inner.global_offset += 1;
+        event.offset = offset;
         
         // Add to stream
         stream.changes.push_back(event);
@@ -127,7 +130,7 @@ impl CDCStream {
             stream.changes.pop_front();
         }
         
-        Ok(inner.global_offset - 1)
+        Ok(offset)
     }
     
     /// Register a consumer

@@ -247,14 +247,37 @@ impl ObservabilitySystem {
     
     /// Get dashboard metrics
     pub fn get_dashboard_metrics(&self) -> Result<DashboardMetrics> {
-        let inner = self.inner.read();
-        let metrics = &inner.metrics;
-        let alerts = &inner.alerts;
+        // Collect all metrics data first, then release the lock
+        let (
+            latencies,
+            cache_hits,
+            cache_misses,
+            start_time,
+            query_count,
+            error_count,
+            active_connections,
+            resource_usage,
+            recent_alerts,
+        ) = {
+            let inner = self.inner.read();
+            let metrics = &inner.metrics;
+            let alerts = &inner.alerts;
+            
+            (
+                metrics.query_latencies.iter().map(|d| d.as_millis() as f64).collect::<Vec<_>>(),
+                metrics.cache_hits,
+                metrics.cache_misses,
+                metrics.start_time,
+                metrics.query_count,
+                metrics.error_count,
+                metrics.active_connections,
+                metrics.resource_usage.clone(),
+                alerts.get_recent_alerts(10),
+            )
+        };
         
         // Calculate percentiles
-        let mut latencies: Vec<_> = metrics.query_latencies.iter()
-            .map(|d| d.as_millis() as f64)
-            .collect();
+        let mut latencies = latencies;
         latencies.sort_by(|a, b| a.partial_cmp(b).unwrap());
         
         let p50 = percentile(&latencies, 0.50);
@@ -267,40 +290,38 @@ impl ObservabilitySystem {
         };
         
         // Calculate cache hit ratio
-        let total_cache_ops = metrics.cache_hits + metrics.cache_misses;
+        let total_cache_ops = cache_hits + cache_misses;
         let cache_hit_ratio = if total_cache_ops > 0 {
-            metrics.cache_hits as f64 / total_cache_ops as f64
+            cache_hits as f64 / total_cache_ops as f64
         } else {
             0.0
         };
         
         // Calculate QPS
-        let uptime = metrics.start_time.elapsed().as_secs();
+        let uptime = start_time.elapsed().as_secs();
         let qps = if uptime > 0 {
-            metrics.query_count as f64 / uptime as f64
+            query_count as f64 / uptime as f64
         } else {
             0.0
         };
         
         // Calculate error rate
-        let error_rate = if metrics.query_count > 0 {
-            metrics.error_count as f64 / metrics.query_count as f64
+        let error_rate = if query_count > 0 {
+            error_count as f64 / query_count as f64
         } else {
             0.0
         };
         
-        // Get index suggestions
-        drop(inner);
+        // Get index suggestions (no lock held)
         let index_suggestions = self.query_analyzer.analyze()?;
-        let inner = self.inner.read();
         
         Ok(DashboardMetrics {
             overview: OverviewMetrics {
                 uptime_seconds: uptime,
-                total_queries: metrics.query_count,
+                total_queries: query_count,
                 queries_per_second: qps,
                 error_rate,
-                active_connections: metrics.active_connections,
+                active_connections,
             },
             performance: PerformanceMetrics {
                 avg_latency_ms: avg,
@@ -311,13 +332,13 @@ impl ObservabilitySystem {
                 throughput_qps: qps,
             },
             resources: ResourceMetrics {
-                cpu_percent: metrics.resource_usage.cpu_percent,
-                memory_bytes: metrics.resource_usage.memory_bytes,
-                disk_bytes: metrics.resource_usage.disk_bytes,
-                network_rx_bytes: metrics.resource_usage.network_rx_bytes,
-                network_tx_bytes: metrics.resource_usage.network_tx_bytes,
+                cpu_percent: resource_usage.cpu_percent,
+                memory_bytes: resource_usage.memory_bytes,
+                disk_bytes: resource_usage.disk_bytes,
+                network_rx_bytes: resource_usage.network_rx_bytes,
+                network_tx_bytes: resource_usage.network_tx_bytes,
             },
-            recent_alerts: alerts.get_recent_alerts(10),
+            recent_alerts,
             index_suggestions: index_suggestions.into_iter().take(5).collect(),
             timestamp: SystemTime::now(),
         })
@@ -356,45 +377,50 @@ impl ObservabilitySystem {
     /// Check alert conditions
     fn check_alerts(&self) {
         let mut inner = self.inner.write();
-        let metrics = &inner.metrics;
+        
+        // Clone rules to avoid borrow issues
+        let rules: Vec<_> = inner.alerts.rules.clone();
+        
+        // Collect triggered alerts first
+        let mut triggered_alerts = Vec::new();
         
         // Check each rule
-        for rule in inner.alerts.rules.clone() {
+        for rule in rules {
             if !rule.enabled {
                 continue;
             }
             
             let triggered = match rule.condition {
                 AlertCondition::HighLatency => {
-                    if let Some(latest) = metrics.query_latencies.back() {
+                    if let Some(latest) = inner.metrics.query_latencies.back() {
                         latest.as_millis() as f64 > rule.threshold
                     } else {
                         false
                     }
                 },
                 AlertCondition::HighErrorRate => {
-                    let error_rate = if metrics.query_count > 0 {
-                        metrics.error_count as f64 / metrics.query_count as f64
+                    let error_rate = if inner.metrics.query_count > 0 {
+                        inner.metrics.error_count as f64 / inner.metrics.query_count as f64
                     } else {
                         0.0
                     };
                     error_rate > rule.threshold
                 },
                 AlertCondition::LowCacheHitRatio => {
-                    let total = metrics.cache_hits + metrics.cache_misses;
+                    let total = inner.metrics.cache_hits + inner.metrics.cache_misses;
                     let ratio = if total > 0 {
-                        metrics.cache_hits as f64 / total as f64
+                        inner.metrics.cache_hits as f64 / total as f64
                     } else {
                         1.0
                     };
                     ratio < rule.threshold
                 },
                 AlertCondition::HighMemoryUsage => {
-                    let usage_gb = metrics.resource_usage.memory_bytes as f64 / 1_073_741_824.0;
+                    let usage_gb = inner.metrics.resource_usage.memory_bytes as f64 / 1_073_741_824.0;
                     usage_gb > rule.threshold
                 },
                 AlertCondition::HighConnectionCount => {
-                    metrics.active_connections as f64 > rule.threshold
+                    inner.metrics.active_connections as f64 > rule.threshold
                 },
                 AlertCondition::SlowQueryDetected => {
                     // Checked by query analyzer
@@ -403,8 +429,13 @@ impl ObservabilitySystem {
             };
             
             if triggered {
-                inner.alerts.trigger_alert(&rule, metrics);
+                triggered_alerts.push(rule);
             }
+        }
+        
+        // Now trigger the alerts (no borrow conflict)
+        for rule in triggered_alerts {
+            inner.alerts.trigger_alert(&rule);
         }
     }
     
@@ -525,7 +556,7 @@ impl AlertManager {
         self.rules.push(rule);
     }
     
-    fn trigger_alert(&mut self, rule: &AlertRule, metrics: &MetricsCollector) {
+    fn trigger_alert(&mut self, rule: &AlertRule) {
         // Check if alert already exists for this rule
         let existing = self.alerts.iter()
             .any(|a| a.rule_id == rule.id && !a.resolved);

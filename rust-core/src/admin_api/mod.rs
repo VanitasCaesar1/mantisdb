@@ -144,7 +144,7 @@ async fn serve_api_docs() -> impl IntoResponse {
 }
 
 /// Embedded admin UI assets directory
-static ASSETS: Dir = include_dir!("../../admin/api/assets/dist");
+static ASSETS: Dir = include_dir!("$CARGO_MANIFEST_DIR/../admin/api/assets/dist");
 
 /// Serve embedded index.html
 async fn serve_index() -> impl IntoResponse {
@@ -156,7 +156,11 @@ async fn serve_index() -> impl IntoResponse {
             body.to_vec(),
         );
     }
-    (StatusCode::NOT_FOUND, "Admin UI not found")
+    (
+        StatusCode::NOT_FOUND,
+        [("Content-Type", "text/plain")],
+        b"Admin UI not found".to_vec(),
+    )
 }
 
 /// Serve any embedded static asset, falling back to index.html for SPA routes
@@ -169,7 +173,7 @@ async fn serve_static(Path(path): Path<String>) -> impl IntoResponse {
         let content_type = mime.first_or_octet_stream().essence_str().to_string();
         return (
             StatusCode::OK,
-            [("Content-Type", content_type.as_str())],
+            [("Content-Type", Box::leak(content_type.into_boxed_str()) as &'static str)],
             file.contents().to_vec(),
         );
     }
@@ -183,7 +187,11 @@ async fn serve_static(Path(path): Path<String>) -> impl IntoResponse {
         );
     }
 
-    (StatusCode::NOT_FOUND, "Not found")
+    (
+        StatusCode::NOT_FOUND,
+        [("Content-Type", "text/plain")],
+        b"Not found".to_vec(),
+    )
 }
 
 /// Build the complete admin API router

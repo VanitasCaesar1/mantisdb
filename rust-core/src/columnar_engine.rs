@@ -208,7 +208,7 @@ impl ColumnData {
         
         while i < self.row_count {
             if let Ok(Some(value)) = self.get_i64(i) {
-                let mut count = 1u32;
+                let mut count = 1usize;
                 while i + count < self.row_count {
                     if let Ok(Some(next)) = self.get_i64(i + count) {
                         if next == value {
@@ -222,7 +222,7 @@ impl ColumnData {
                 }
                 
                 // Write run: count + value
-                compressed.extend_from_slice(&count.to_le_bytes());
+                compressed.extend_from_slice(&(count as u32).to_le_bytes());
                 compressed.extend_from_slice(&value.to_le_bytes());
                 i += count as usize;
             } else {

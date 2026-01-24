@@ -163,6 +163,18 @@ pub enum Error {
     
     #[error("Validation error: {0}")]
     ValidationError(String),
+
+    #[error("Configuration error: {0}")]
+    ConfigError(String),
+
+    #[error("General error: {0}")]
+    General(String),
+
+    #[error("Parse error: {0}")]
+    ParseError(String),
+
+    #[error("Query error: {0}")]
+    QueryError(String),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;

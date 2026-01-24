@@ -114,6 +114,9 @@ impl FullTextSearch {
     ) -> Result<()> {
         let mut inner = self.inner.write();
         
+        // Clone stop_words to avoid borrow conflict
+        let stop_words = inner.stop_words.clone();
+        
         let index = inner.indexes.get_mut(collection)
             .ok_or_else(|| Error::General(format!("Index '{}' not found", collection)))?;
         
@@ -125,7 +128,7 @@ impl FullTextSearch {
         // Tokenize and index each field
         let mut total_terms = 0;
         for (field, value) in &fields {
-            let tokens = self.tokenize(&value, &index.config, &inner.stop_words);
+            let tokens = self.tokenize(&value, &index.config, &stop_words);
             total_terms += tokens.len() as u32;
             
             for token in tokens {

@@ -4,6 +4,7 @@
 
 use crate::error::{Error, Result};
 use parking_lot::RwLock;
+use serde::Serialize;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -20,7 +21,7 @@ pub struct QueryRecord {
 }
 
 /// Index suggestion
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct IndexSuggestion {
     pub table: String,
     pub columns: Vec<String>,
@@ -32,7 +33,7 @@ pub struct IndexSuggestion {
     pub affected_queries: usize,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub enum IndexType {
     BTree,
     Hash,
